@@ -1,0 +1,34 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Stretch">
+<meta name="theme-color" content="#0f1720"><link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" href="icon.svg">
+<title>Stretch 15</title><link rel="stylesheet" href="style.css"></head><body>
+<section id="home">
+ <header><h1>Stretch 15</h1><button id="histBtn" class="ghost">History</button></header>
+ <div class="card row"><div><big id="planTotal">15:00</big><small><span id="planCount"></span> stretches</small></div>
+  <button id="regen" class="ghost" aria-label="Regenerate">↻ New routine</button></div>
+ <div class="opts"><label>Length <select id="minutes"><option>10</option><option>15</option><option>20</option><option>25</option></select> min</label>
+  <label>Focus <select id="bias"><option value="balanced">Balanced</option><option value="legs">Legs &amp; hips</option><option value="upper">Back &amp; shoulders</option></select></label></div>
+ <ol id="planList" class="list"></ol>
+ <details class="card"><summary>Apple Health logging</summary>
+  <label>Shortcut name <input id="scName"></label>
+  <label class="chk"><input type="checkbox" id="autoLog"> Open Shortcut automatically at the end</label>
+  <button id="testSc" class="ghost">Test Shortcut (logs 1 min)</button>
+  <p class="muted">Setup steps are in the README. Gentle stretching only — stop if anything hurts.</p></details>
+ <button id="startBtn" class="primary">Start</button>
+</section>
+<section id="player" hidden>
+ <div class="top"><span id="pStep"></span><span id="pTotal"></span></div>
+ <div id="pPhase"></div><div id="pIcon" class="bigicon"></div><h2 id="pName"></h2>
+ <div id="pTime" class="timer">0:00</div><div class="bar"><div id="pBar"></div></div>
+ <p id="pCue" class="cue"></p><p id="pNext" class="muted"></p>
+ <div class="controls"><button id="stopBtn" class="ghost">End</button><button id="pauseBtn" class="primary">Pause</button><button id="skipBtn" class="ghost">Skip ›</button></div>
+</section>
+<section id="done" hidden><div class="bigicon">✅</div><h2>Done!</h2><p id="doneMsg"></p>
+ <a id="logBtn" class="primary btn" href="#">Log to Apple Health</a><button id="homeBtn" class="ghost">Back to start</button></section>
+<section id="history" hidden><header><button id="backBtn" class="ghost">‹ Back</button><h1>History</h1></header>
+ <p id="histWeek" class="muted"></p><ol id="histList" class="list"></ol>
+ <div class="row"><button id="exportHist" class="ghost">Export JSON</button><button id="clearHist" class="ghost">Clear</button></div></section>
+<script src="stretches.js"></script><script src="generator.js"></script><script src="app.js"></script></body></html>

@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#1b5e20">
+<title>Trail Planner</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:system-ui,-apple-system,sans-serif}
+#map{position:absolute;inset:0 0 var(--panel-h,170px) 0}
+#panel{position:absolute;left:0;right:0;bottom:0;height:var(--panel-h,170px);background:#fff;border-top:1px solid #ccc;padding:6px 8px;display:flex;flex-direction:column;gap:4px}
+#stats{display:flex;gap:12px;font-size:15px;font-weight:600}#stats span small{font-weight:400;color:#666}
+#bar{display:flex;gap:6px;flex-wrap:wrap}
+button{font-size:15px;padding:8px 10px;border-radius:8px;border:1px solid #888;background:#f4f4f4;touch-action:manipulation}
+button.on{background:#1b5e20;color:#fff;border-color:#1b5e20}
+#profile{flex:1;min-height:50px;width:100%}
+#msg{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:6px 10px;border-radius:6px;font-size:13px;z-index:1000;display:none;max-width:90%}
+.drawing #map,.wptmode #map{cursor:crosshair}
+#wpts{position:absolute;right:6px;bottom:calc(var(--panel-h,170px) + 6px);z-index:900;background:#fff;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.35);max-height:38%;overflow:auto;width:min(330px,calc(100% - 60px));display:none;font-size:14px}
+#wpts.open{display:block}#wpts h4{margin:0;padding:6px 8px;background:#1b5e20;color:#fff;font-size:13px;position:sticky;top:0}
+.wrow{display:flex;gap:4px;align-items:center;padding:4px 6px;border-top:1px solid #eee}.wrow input{flex:1;min-width:0;font-size:15px;padding:4px}.wrow select{font-size:16px;padding:2px}.wrow button{padding:4px 7px}
+.wicon{font-size:20px;line-height:26px;width:28px;height:28px;text-align:center;background:#fff;border:2px solid #6a1b9a;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)}
+</style></head><body>
+<div id="map"></div><div id="msg"></div><div id="wpts"></div>
+<div id="panel">
+ <div id="stats"><span id="dist">0.00 <small>km</small></span><span id="asc">↑0 <small>m</small></span><span id="desc">↓0 <small>m</small></span><span id="busy"></span><button id="eleWarn" style="display:none;font-size:12px;padding:2px 6px;background:#fff3e0;border-color:#e65100;color:#bf360c"></button></div>
+ <div id="bar">
+  <button id="mSnap" class="on" title="Tap points; routed on trails">📍 Snap</button>
+  <button id="mFree" title="Drag to draw freehand">✏️ Freehand</button>
+  <button id="mWpt" title="Tap map to drop a waypoint">📌 Waypoint</button><button id="wList" title="Waypoint list">📋 0</button>
+  <button id="undo">↶ Undo</button><button id="clear">🗑 Clear</button><button id="exp">⬇ GPX</button><button id="imp" title="Import a GPX file">📂 Import</button><input type="file" id="impFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" style="display:none"><button id="loc" title="My location">◎</button>
+ </div>
+ <canvas id="profile"></canvas>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+"use strict";
+const HOME=[-41.1050,174.8400]; // Titahi Bay, Porirua
+const BROUTER="https://brouter.de/brouter", PROFILE="hiking-mountain";
+const map=L.map('map',{zoomControl:true}).setView(HOME,14);
+const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'});
+const topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap, SRTM | © OpenTopoMap (CC-BY-SA)'});
+topo.addTo(map);L.control.layers({'OpenTopoMap':topo,'OpenStreetMap':osm}).addTo(map);
+L.control.scale({imperial:false}).addTo(map);
+map.on("locationfound",e=>map.setView(e.latlng,15));
+
+// ---- state: anchors[i] = {lat,lng}; segs[i] joins anchors[i]->anchors[i+1]: {mode,pts:[[lat,lng,ele|null]],fallback}
+let mode='snap',anchors=[],segs=[],markers=[],lines=[],pending=0;
+const $=id=>document.getElementById(id);
+function toast(t,ms=3000){const m=$('msg');m.textContent=t;m.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>m.style.display='none',ms)}
+function setBusy(d){pending+=d;$('busy').textContent=pending>0?'⏳':'';if(typeof updEleWarn==='function'&&!pending)updEleWarn()}
+
+// ---- geo utils
+function hav(a,b){const R=6371008.8,r=Math.PI/180,dl=(b[0]-a[0])*r,dg=(b[1]-a[1])*r;const h=Math.sin(dl/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
+function densify(a,b,step=25){const d=hav(a,b),n=Math.max(1,Math.ceil(d/step)),o=[];for(let i=0;i<=n;i++)o.push([a[0]+(b[0]-a[0])*i/n,a[1]+(b[1]-a[1])*i/n,null]);return o}
+
+// ---- elevation (Open-Meteo primary, Open-Elevation fallback; both CORS-enabled, keyless)
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const okNum=v=>typeof v==='number'&&isFinite(v)&&v>-500&&v<9000;
+async function getJSON(url,opt,tries=3){ // retries with exponential backoff (+ honours 429/5xx)
+  for(let k=0;k<tries;k++){
+    try{const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),15000);
+      const r=await fetch(url,{...opt,signal:ctl.signal});clearTimeout(t);
+      if(r.ok)return await r.json();
+      if(r.status<429&&r.status!==408)return null; // permanent client error
+    }catch(e){}
+    if(k<tries-1)await sleep(600*2**k+Math.random()*300)}
+  return null}
+let eleWarn=0;
+async function fillEle(pts){ // fills p[2] in place; returns number still missing
+  const need=pts.filter(p=>p[2]==null||!okNum(p[2]));
+  for(let i=0;i<need.length;i+=100){
+    const ch=need.slice(i,i+100);let ele=null;
+    let j=await getJSON(`https://api.open-meteo.com/v1/elevation?latitude=${ch.map(p=>p[0].toFixed(6)).join(',')}&longitude=${ch.map(p=>p[1].toFixed(6)).join(',')}`);
+    if(j&&Array.isArray(j.elevation))ele=j.elevation;
+    if(!ele||!ele.some(okNum)){j=await getJSON('https://api.open-elevation.com/api/v1/lookup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations:ch.map(p=>({latitude:p[0],longitude:p[1]}))})});
+      if(j&&Array.isArray(j.results))ele=j.results.map(x=>x.elevation)}
+    if(ele)ch.forEach((p,k)=>p[2]=okNum(ele[k])?ele[k]:null);else ch.forEach(p=>p[2]=null);
+    if(need.length>100)await sleep(150)}
+  const miss=pts.filter(p=>p[2]==null).length;updEleWarn();return miss}
+function allPts(){const o=[];segs.forEach(s=>o.push(...s.pts));return o}
+function updEleWarn(){const n=allPts().filter(p=>p[2]==null).length+wpts.filter(w=>w.ele==null).length;eleWarn=n;
+  const b=$('eleWarn');if(!b)return;b.style.display=n&&!pending?'inline-block':'none';b.textContent=`⚠ No elevation for ${n} pt${n>1?'s':''} – retry`}
+async function backfillAll(){setBusy(1);try{await fillEle(allPts());for(const w of wpts)if(w.ele==null){const p=[w.lat,w.lng,null];await fillEle([p]);w.ele=p[2]}}finally{setBusy(-1)}save();render();renderW();return eleWarn}
+function interpEle(pts){ // last resort: fill gaps linearly from neighbours (only between known values)
+  let last=-1;for(let i=0;i<pts.length;i++){if(pts[i][2]==null)continue;
+    if(last>=0&&i-last>1){for(let k=last+1;k<i;k++)pts[k][2]=pts[last][2]+(pts[i][2]-pts[last][2])*(k-last)/(i-last)}last=i}}
+
+// ---- routing
+async function route(a,b){
+  const url=`${BROUTER}?lonlats=${a.lng.toFixed(6)},${a.lat.toFixed(6)}|${b.lng.toFixed(6)},${b.lat.toFixed(6)}&profile=${PROFILE}&alternativeidx=0&format=geojson`;
+  try{const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),20000);
+    const r=await fetch(url,{signal:ctl.signal});clearTimeout(t);
+    if(!r.ok)throw new Error(await r.text());
+    const g=await r.json();const c=g.features[0].geometry.coordinates;
+    return {pts:c.map(x=>[x[1],x[0],x.length>2?x[2]:null]),fallback:false};
+  }catch(e){console.warn('BRouter failed',e);toast('No trail route found – used straight line');
+    return {pts:densify([a.lat,a.lng],[b.lat,b.lng]),fallback:true}}
+}
+async function buildSeg(i){ // (re)compute segs[i]
+  const s=segs[i],a=anchors[i],b=anchors[i+1];setBusy(1);
+  try{
+    if(s.mode==='snap'){const r=await route(a,b);if(segs[i]!==s)return;s.pts=r.pts;s.fallback=r.fallback}
+    else{const pv=i>0&&segs[i-1].pts.length?segs[i-1].pts.at(-1):null;s.pts[0]=pv?[pv[0],pv[1],null]:[a.lat,a.lng,null];s.pts[s.pts.length-1]=[b.lat,b.lng,null]}
+    await fillEle(s.pts);
+  }finally{setBusy(-1)}
+  if(segs[i]===s)render();
+}
+
+// ---- interaction
+function addAnchor(ll){anchors.push({lat:ll.lat,lng:ll.lng});addMarker(anchors.length-1)}
+function addMarker(i){
+  const m=L.marker(anchors[i],{draggable:mode==='snap',icon:L.divIcon({className:'',html:`<div style="width:16px;height:16px;border-radius:50%;background:${i?'#fff':'#2e7d32'};border:3px solid #1b5e20"></div>`,iconSize:[16,16],iconAnchor:[8,8]})}).addTo(map);
+  m.on('dragend',()=>{const idx=markers.indexOf(m),ll=m.getLatLng();anchors[idx]={lat:ll.lat,lng:ll.lng};
+    if(idx>0)buildSeg(idx-1);if(idx<segs.length)buildSeg(idx);save()});
+  markers.push(m);
+}
+map.on('click',e=>{if(mode==='wpt'){addWpt(e.latlng);return}if(mode!=='snap')return;
+  addAnchor(e.latlng);if(anchors.length>1){segs.push({mode:'snap',pts:[]});buildSeg(segs.length-1)}save()});
+
+// freehand drawing with pointer events
+let drawing=null,drawLine=null;const mc=map.getContainer();
+mc.addEventListener('pointerdown',e=>{if(mode!=='free'||e.target.closest('.leaflet-control'))return;
+  e.preventDefault();e.stopPropagation();mc.setPointerCapture(e.pointerId);const ll=map.mouseEventToLatLng(e);
+  drawing=[];if(anchors.length){const pv=segs.length&&segs.at(-1).pts.length?segs.at(-1).pts.at(-1):[anchors.at(-1).lat,anchors.at(-1).lng];drawing.push([pv[0],pv[1],null])}
+  drawing.push([ll.lat,ll.lng,null]);drawLine=L.polyline(drawing,{color:'#e65100',weight:4,dashArray:'4 6'}).addTo(map)},true);
+mc.addEventListener('pointermove',e=>{if(!drawing)return;const ll=map.mouseEventToLatLng(e),p=[ll.lat,ll.lng,null];
+  if(hav(drawing.at(-1),p)>=8){drawing.push(p);drawLine.setLatLngs(drawing)}});
+function endDraw(){if(!drawing)return;const pts=drawing;drawing=null;map.removeLayer(drawLine);
+  if(!anchors.length){addAnchor({lat:pts[0][0],lng:pts[0][1]})}
+  if(pts.length<2||hav(pts[0],pts.at(-1))<5&&pts.length<3){save();render();return}
+  // densify long gaps (max 30 m) so freehand lines carry elevation detail
+  const d=[pts[0]];for(let i=1;i<pts.length;i++){const s=densify(pts[i-1],pts[i],30);d.push(...s.slice(1))}
+  const end=pts.at(-1);addAnchor({lat:end[0],lng:end[1]});segs.push({mode:'free',pts:d});buildSeg(segs.length-1);save()}
+mc.addEventListener('pointerup',endDraw);mc.addEventListener('pointercancel',endDraw);
+
+function setMode(m){mode=m;$('mSnap').classList.toggle('on',m==='snap');$('mFree').classList.toggle('on',m==='free');
+  document.body.classList.toggle('drawing',m==='free');$('mWpt').classList.toggle('on',m==='wpt');document.body.classList.toggle('wptmode',m==='wpt');
+  markers.forEach(k=>k.dragging&&(m==='free'?k.dragging.disable():k.dragging.enable()));
+  if(m==='free'){map.dragging.disable();toast('Freehand: drag to draw. Pinch/buttons to zoom.')}else map.dragging.enable();if(m==='wpt')toast('Waypoint: tap the map to drop one')}
+$('mSnap').onclick=()=>setMode('snap');$('mWpt').onclick=()=>setMode('wpt');$('mFree').onclick=()=>setMode('free');
+$('undo').onclick=()=>{if(!anchors.length)return;anchors.pop();map.removeLayer(markers.pop());if(segs.length>=anchors.length&&segs.length)segs.pop();render();save()};
+$('clear').onclick=()=>{if(anchors.length&&!confirm('Clear the whole route?'))return;anchors=[];segs=[];markers.forEach(m=>map.removeLayer(m));markers=[];if(wpts.length&&confirm('Also delete the '+wpts.length+' waypoint(s)?'))while(wpts.length)delWpt(0);render();save()};
+
+// ---- stats
+function trackPts(){const o=[];segs.forEach(s=>s.pts.forEach((p,k)=>{if(k===0&&o.length)return;o.push(p)}));return o}
+function climb(pts,th=3){let up=0,dn=0,ref=null;for(const p of pts){if(p[2]==null)continue;if(ref==null){ref=p[2];continue}
+  const d=p[2]-ref;if(d>=th){up+=d;ref=p[2]}else if(d<=-th){dn-=d;ref=p[2]}}return[up,dn]}
+function render(){
+  lines.forEach(l=>map.removeLayer(l));lines=segs.map(s=>L.polyline(s.pts.map(p=>[p[0],p[1]]),{color:s.imported?'#6a1b9a':s.mode==='free'?'#e65100':(s.fallback?'#c62828':'#1565c0'),weight:5,opacity:.85,dashArray:s.mode==='free'&&!s.imported?'8 6':null}).addTo(map));
+  const pts=trackPts();let dist=0;const prof=[];pts.forEach((p,i)=>{if(i)dist+=hav(pts[i-1],p);prof.push([dist,p[2]])});
+  const [up,dn]=climb(pts);$('dist').innerHTML=`${(dist/1000).toFixed(2)} <small>km</small>`;
+  $('asc').innerHTML=`↑${Math.round(up)} <small>m</small>`;$('desc').innerHTML=`↓${Math.round(dn)} <small>m</small>`;drawProfile(prof)}
+function drawProfile(prof){const c=$('profile'),r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;c.width=r.width*dpr;c.height=r.height*dpr;
+  const x=c.getContext('2d');x.scale(dpr,dpr);const W=r.width,H=r.height;x.clearRect(0,0,W,H);
+  const v=prof.filter(p=>p[1]!=null);if(v.length<2){x.fillStyle='#999';x.font='12px sans-serif';x.fillText('Elevation profile appears here',8,H/2);return}
+  const D=prof.at(-1)[0]||1;let lo=Math.min(...v.map(p=>p[1])),hi=Math.max(...v.map(p=>p[1]));if(hi-lo<20){hi=lo+20}
+  const L0=34,X=d=>L0+d/D*(W-L0-4),Y=e=>H-12-(e-lo)/(hi-lo)*(H-18);
+  x.beginPath();x.moveTo(X(v[0][0]),H-12);v.forEach(p=>x.lineTo(X(p[0]),Y(p[1])));x.lineTo(X(v.at(-1)[0]),H-12);x.closePath();x.fillStyle='rgba(46,125,50,.35)';x.fill();
+  x.beginPath();v.forEach((p,i)=>i?x.lineTo(X(p[0]),Y(p[1])):x.moveTo(X(p[0]),Y(p[1])));x.strokeStyle='#1b5e20';x.lineWidth=1.5;x.stroke();
+  x.fillStyle='#333';x.font='10px sans-serif';x.fillText(Math.round(hi)+'m',0,10);x.fillText(Math.round(lo)+'m',0,H-12);x.fillText((D/1000).toFixed(1)+' km',W-40,H-1)}
+addEventListener('resize',render);
+$("loc").onclick=()=>map.locate({enableHighAccuracy:true});
+
+// ---- GPX export
+function simplify(pts,tol){ // Douglas-Peucker in local metres
+  if(pts.length<3)return pts;const r=Math.PI/180,k=Math.cos(pts[0][0]*r)*6371008.8*r,m=6371008.8*r;
+  const P=pts.map(p=>[p[1]*k,p[0]*m]),keep=new Uint8Array(pts.length);keep[0]=keep[pts.length-1]=1;const st=[[0,pts.length-1]];
+  while(st.length){const[a,b]=st.pop();let md=0,mi=-1;const[ax,ay]=P[a],[bx,by]=P[b],dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy||1;
+    for(let i=a+1;i<b;i++){let t=((P[i][0]-ax)*dx+(P[i][1]-ay)*dy)/L2;t=Math.max(0,Math.min(1,t));const d=Math.hypot(P[i][0]-ax-t*dx,P[i][1]-ay-t*dy);if(d>md){md=d;mi=i}}
+    if(md>tol){keep[mi]=1;st.push([a,mi],[mi,b])}}
+  return pts.filter((_,i)=>keep[i])}
+const esc=s=>s.replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
+function makeGpx(name,pts,wps=wpts){
+  // simplify to ~2 m, keep under ~3000 pts (safe for older Garmin course limits)
+  let tol=2,out=simplify(pts,tol);while(out.length>3000){tol*=1.5;out=simplify(pts,tol)}
+  const n=esc(name);return `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="Trail Planner" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
+  <metadata><name>${n}</name><time>${new Date().toISOString().replace(/\.\d+Z/,'Z')}</time></metadata>
+${wps.map(w=>`  <wpt lat="${(+w.lat).toFixed(6)}" lon="${(+w.lng).toFixed(6)}">${w.ele!=null?`<ele>${(+w.ele).toFixed(1)}</ele>`:''}<name>${esc(w.name||WTYPES[w.type].label)}</name><sym>${esc((WTYPES[w.type]||WTYPES.other).sym)}</sym><type>${w.type}</type></wpt>\n`).join('')}  <trk><name>${n}</name><type>trail_running</type><trkseg>
+${out.map(p=>`    <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}">${p[2]!=null?`<ele>${(+p[2]).toFixed(1)}</ele>`:''}</trkpt>`).join('\n')}
+  </trkseg></trk>
+</gpx>
+`}
+$('exp').onclick=async()=>{const pts=trackPts();if(pts.length<2)return toast('Draw a route first');if(pending)return toast('Still loading route/elevation…');
+  if(await backfillAll()){interpEle(trackPts());const n=trackPts().filter(p=>p[2]==null).length;render();
+    if(n&&!confirm(`Elevation service unavailable: ${n} of ${trackPts().length} track points have no elevation. Your watch/app will show no climb for those.\n\nExport anyway (points without data get no <ele>)?`))return}
+  const name=(prompt('Route name',importName||'Titahi Bay trail run')||'').trim();if(!name)return;
+  const gpx=makeGpx(name,trackPts()),fn=name.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_')+'.gpx';
+  const file=new File([gpx],fn,{type:'application/gpx+xml'});
+  if(navigator.canShare&&navigator.canShare({files:[file]})&&/Mobi|Android|iPhone|iPad/.test(navigator.userAgent)){try{await navigator.share({files:[file],title:name});return}catch(e){if(e.name==='AbortError')return}}
+  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)};
+
+// ---- waypoints: {lat,lng,ele,name,type}
+const WTYPES={drink:{icon:'💧',label:'Drink stop',sym:'Drinking Water'},food:{icon:'🍴',label:'Food',sym:'Restaurant'},viewpoint:{icon:'👀',label:'Viewpoint',sym:'Scenic Area'},toilet:{icon:'🚻',label:'Toilet',sym:'Restroom'},other:{icon:'🚩',label:'Waypoint',sym:'Flag, Blue'}};
+let wpts=[],wmarkers=[];
+const wIcon=t=>L.divIcon({className:'',html:`<div class="wicon">${WTYPES[t].icon}</div>`,iconSize:[28,28],iconAnchor:[14,14]});
+function wMarker(w){const m=L.marker([w.lat,w.lng],{icon:wIcon(w.type),draggable:true,zIndexOffset:1000}).addTo(map);
+  m.bindTooltip(()=>esc(w.name),{direction:'top',offset:[0,-14]});
+  m.on('click',()=>{$('wpts').classList.add('open');renderW()});
+  m.on('dragend',async()=>{const ll=m.getLatLng();w.lat=ll.lat;w.lng=ll.lng;const p=[w.lat,w.lng,null];await fillEle([p]);w.ele=p[2];save();renderW()});
+  return m}
+async function addWpt(ll,type='drink',name){const w={lat:ll.lat,lng:ll.lng,ele:null,type,name:name||WTYPES[type].label};wpts.push(w);wmarkers.push(wMarker(w));
+  $('wpts').classList.add('open');renderW();save();const p=[w.lat,w.lng,null];await fillEle([p]);w.ele=p[2];save();renderW();return w}
+function delWpt(i){map.removeLayer(wmarkers[i]);wpts.splice(i,1);wmarkers.splice(i,1);renderW();save()}
+function renderW(){const el=$('wpts');$('wList').textContent='📋 '+wpts.length;
+  el.innerHTML=`<h4>Waypoints (${wpts.length}) <span style="float:right;cursor:pointer" id="wClose">✕</span></h4>`+(wpts.length?'':'<div class="wrow">None yet. Use 📌 Waypoint and tap the map.</div>')+
+  wpts.map((w,i)=>`<div class="wrow" data-i="${i}"><select>${Object.entries(WTYPES).map(([k,v])=>`<option value="${k}"${k===w.type?' selected':''}>${v.icon}</option>`).join('')}</select><input value="${esc(w.name)}" maxlength="40"><small>${w.ele!=null?Math.round(w.ele)+'m':''}</small><button class="wgo">🎯</button><button class="wdel">✕</button></div>`).join('');
+  $('wClose').onclick=()=>el.classList.remove('open');
+  el.querySelectorAll('.wrow[data-i]').forEach(r=>{const i=+r.dataset.i,w=wpts[i];
+    r.querySelector('select').onchange=e=>{const old=WTYPES[w.type].label;w.type=e.target.value;if(w.name===old||!w.name)w.name=WTYPES[w.type].label;wmarkers[i].setIcon(wIcon(w.type));save();renderW()};
+    r.querySelector('input').onchange=e=>{w.name=e.target.value.trim()||WTYPES[w.type].label;save()};
+    r.querySelector('.wgo').onclick=()=>map.setView([w.lat,w.lng],Math.max(map.getZoom(),15));
+    r.querySelector('.wdel').onclick=()=>delWpt(i)})}
+$('wList').onclick=()=>{$('wpts').classList.toggle('open');renderW()};
+
+// ---- GPX import: trk (all trksegs joined) or rte, plus wpt; keeps file <ele>, fetches the rest
+function parseGpx(text){const d=new DOMParser().parseFromString(text,'application/xml');if(d.getElementsByTagName('parsererror').length)throw new Error('Not valid XML');
+  const q=(el,t)=>Array.from(el.getElementsByTagNameNS('*',t));const pt=e=>{const ee=q(e,'ele')[0],v=ee?parseFloat(ee.textContent):NaN;return[parseFloat(e.getAttribute('lat')),parseFloat(e.getAttribute('lon')),okNum(v)?v:null]};
+  let pts=q(d,'trkpt').map(pt);if(!pts.length)pts=q(d,'rtept').map(pt);pts=pts.filter(p=>isFinite(p[0])&&isFinite(p[1]));
+  const nm=(q(d,'trk')[0]||q(d,'rte')[0]||q(d,'metadata')[0]);const name=nm&&q(nm,'name')[0]?q(nm,'name')[0].textContent.trim():'';
+  const SYM={'drinking water':'drink',restaurant:'food','scenic area':'viewpoint',restroom:'toilet'};
+  const w=q(d,'wpt').map(e=>{const p=pt(e),n=q(e,'name')[0],sy=q(e,'sym')[0],ty=q(e,'type')[0];let t=ty&&WTYPES[ty.textContent.trim()]?ty.textContent.trim():(sy&&SYM[sy.textContent.trim().toLowerCase()])||'other';
+    return{lat:p[0],lng:p[1],ele:p[2],type:t,name:(n&&n.textContent.trim())||WTYPES[t].label}}).filter(x=>isFinite(x.lat));
+  return{pts,wpts:w,name}}
+async function importGpx(text){const g=parseGpx(text);if(g.pts.length<2&&!g.wpts.length)return toast('No track, route or waypoints found in that GPX');
+  if((anchors.length||wpts.length)&&!confirm('Replace the current route and waypoints with the imported GPX?'))return;
+  anchors=[];segs=[];markers.forEach(m=>map.removeLayer(m));markers=[];while(wpts.length)delWpt(0);
+  let fresh=[];
+  if(g.pts.length>=2){const pts=g.pts.filter((p,i)=>!i||hav(g.pts[i-1],p)>0.5);addAnchor({lat:pts[0][0],lng:pts[0][1]});addAnchor({lat:pts.at(-1)[0],lng:pts.at(-1)[1]});
+    segs.push({mode:'free',imported:true,pts});fresh=pts}
+  g.wpts.forEach(w=>{wpts.push(w);wmarkers.push(wMarker(w))});renderW();
+  const b=fresh.length?L.latLngBounds(fresh.map(p=>[p[0],p[1]])):L.latLngBounds(g.wpts.map(w=>[w.lat,w.lng]));map.fitBounds(b,{padding:[30,30]});
+  importName=g.name;const had=fresh.filter(p=>p[2]!=null).length;render();save();
+  toast(`Imported ${fresh.length} pts${g.wpts.length?`, ${g.wpts.length} waypoints`:''}. Elevation: ${had===fresh.length?'from file':had?'partly from file, fetching rest…':'fetching…'}`,4000);
+  const miss=await backfillAll();if(miss)toast(`⚠ Elevation unavailable for ${miss} points – tap the warning to retry`,6000)}
+let importName='';
+$('imp').onclick=()=>$('impFile').click();
+$('impFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{await importGpx(await f.text())}catch(err){toast('Could not read GPX: '+err.message,5000)}};
+$('eleWarn').onclick=async()=>{const n=await backfillAll();toast(n?`Still no elevation for ${n} points (service unavailable?)`:'Elevation filled ✓')};
+
+// ---- persistence
+function save(){try{localStorage.setItem('tp-route',JSON.stringify({anchors,segs,wpts}))}catch(e){}}
+try{const s=JSON.parse(localStorage.getItem('tp-route')||'null');if(s&&Array.isArray(s.wpts)){s.wpts.forEach(w=>{if(!WTYPES[w.type])w.type='other';wpts.push(w);wmarkers.push(wMarker(w))})}
+  if(s&&s.anchors){s.anchors.forEach(a=>addAnchor(a));segs=s.segs;if(anchors.length)map.fitBounds(L.latLngBounds(anchors),{padding:[30,30],maxZoom:16})}}catch(e){}
+render();renderW();if(eleWarn||allPts().some(p=>p[2]==null))backfillAll();
+window.TP={importGpx,parseGpx,backfillAll,interpEle,addWpt,makeGpx,simplify,climb,route,fillEle}; // for testing
+</script></body></html>
