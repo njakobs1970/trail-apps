@@ -36,7 +36,8 @@ window.STRETCHES = [
 "106,28 106,40 104,76 128,82 122,110 82,110 60,108 110,24 112,10 108,26 114,12"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "couch",
@@ -72,7 +73,10 @@ window.STRETCHES = [
 "88,32 88,44 88,80 112,82 112,110 54,108 44,80 92,60 98,76 90,60 96,76"
 ],
 "prop": "wall:40",
-"kind": ""
+"kind": "",
+"equip": [
+"wall"
+]
 },
 {
 "id": "pigeon",
@@ -109,7 +113,8 @@ window.STRETCHES = [
 "132,96 120,92 92,96 112,104 90,108 62,106 34,108 140,102 160,108 138,102 158,108"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "figure4",
@@ -146,7 +151,8 @@ window.STRETCHES = [
 "30,102 42,104 76,104 88,80 74,70 76,72 98,62 58,88 74,76 58,88 74,76"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "90-90",
@@ -180,7 +186,8 @@ window.STRETCHES = [
 "122,66 116,76 100,98 132,104 112,110 70,104 66,86 126,92 136,104 112,92 122,106"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "frog",
@@ -214,7 +221,8 @@ window.STRETCHES = [
 "130,92 118,94 80,92 98,110 72,110 98,110 72,110 128,108 150,108 128,108 150,108"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "butterfly",
@@ -249,7 +257,8 @@ window.STRETCHES = [
 "122,76 112,82 88,104 118,98 108,106 118,98 108,106 116,96 108,104 116,96 108,104"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "lizard",
@@ -285,7 +294,8 @@ window.STRETCHES = [
 "146,86 132,90 104,96 138,88 142,110 76,110 52,108 130,108 150,108 130,108 150,108"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "adductor-rock",
@@ -319,7 +329,8 @@ window.STRETCHES = [
 "120,40 120,52 124,84 146,88 140,110 92,98 60,110 112,68 130,80 128,68 132,80"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "standing-ham",
@@ -353,7 +364,8 @@ window.STRETCHES = [
 "146,48 134,54 98,68 118,89 136,110 96,90 92,110 136,72 126,88 136,72 126,88"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "supine-ham",
@@ -388,7 +400,11 @@ window.STRETCHES = [
 "30,102 42,104 76,104 82,82 88,58 100,104 124,104 54,88 70,74 54,88 70,74"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": [
+"strap"
+],
+"swap": "thigh-ham"
 },
 {
 "id": "seated-fold",
@@ -424,7 +440,8 @@ window.STRETCHES = [
 "112,84 100,86 70,104 94,104 118,98 94,104 118,98 108,94 118,100 108,94 118,100"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "wide-fold",
@@ -458,7 +475,8 @@ window.STRETCHES = [
 "100,96 100,84 100,66 122,88 144,110 78,88 56,110 90,96 92,110 110,96 108,110"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "quad-stand",
@@ -492,7 +510,10 @@ window.STRETCHES = [
 "100,20 100,32 100,64 100,90 86,70 100,87 100,110 92,52 86,70 114,44 130,42"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": [
+"wall"
+]
 },
 {
 "id": "side-quad",
@@ -528,7 +549,8 @@ window.STRETCHES = [
 "30,98 42,100 76,100 100,104 78,84 100,102 124,104 62,90 78,84 36,108 28,104"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "calf-wall",
@@ -562,7 +584,10 @@ window.STRETCHES = [
 "140,32 134,44 116,70 138,90 136,110 96,90 76,110 150,52 158,46 150,52 158,46"
 ],
 "prop": "wall:160",
-"kind": ""
+"kind": "",
+"equip": [
+"wall"
+]
 },
 {
 "id": "soleus",
@@ -596,7 +621,10 @@ window.STRETCHES = [
 "134,40 126,52 106,80 134,94 136,110 100,98 82,110 146,52 158,48 146,52 158,48"
 ],
 "prop": "wall:160",
-"kind": ""
+"kind": "",
+"equip": [
+"wall"
+]
 },
 {
 "id": "step-calf",
@@ -631,7 +659,11 @@ window.STRETCHES = [
 "116,14 116,26 116,58 118,80 118,102 116,80 116,102 126,40 140,40 126,40 140,40"
 ],
 "prop": "step",
-"kind": ""
+"kind": "",
+"equip": [
+"step"
+],
+"swap": "downdog"
 },
 {
 "id": "downdog",
@@ -668,7 +700,8 @@ window.STRETCHES = [
 "136,98 126,86 98,54 80,82 62,110 80,82 62,110 138,98 152,110 138,98 152,110"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "toe-sit",
@@ -702,7 +735,8 @@ window.STRETCHES = [
 "88,52 88,64 84,98 112,110 82,106 112,110 82,106 96,82 108,98 96,82 108,98"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "shin",
@@ -737,7 +771,8 @@ window.STRETCHES = [
 "72,56 76,68 84,98 110,98 82,110 110,98 82,110 70,88 62,110 70,88 62,110"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "it-cross",
@@ -773,7 +808,8 @@ window.STRETCHES = [
 "84,24 90,36 106,66 100,88 112,110 104,88 92,110 80,22 70,14 98,50 104,60"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "childs",
@@ -809,7 +845,8 @@ window.STRETCHES = [
 "130,102 118,100 84,98 110,110 82,110 110,110 82,110 144,106 164,108 144,106 164,108"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "cat-cow",
@@ -844,7 +881,8 @@ window.STRETCHES = [
 "148,72 134,84 98,84 98,110 74,110 98,110 74,110 134,97 134,110 134,97 134,110 116,96"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "supine-twist",
@@ -879,7 +917,8 @@ window.STRETCHES = [
 "26,98 42,104 76,104 98,98 112,108 96,94 112,104 50,96 58,92 50,96 58,92"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "thread-needle",
@@ -914,7 +953,8 @@ window.STRETCHES = [
 "138,102 128,98 98,84 98,110 74,110 98,110 74,110 136,100 134,110 116,104 100,108"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "cobra",
@@ -949,7 +989,8 @@ window.STRETCHES = [
 "120,62 112,74 82,104 56,106 32,106 56,106 32,106 116,92 116,110 116,92 116,110"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "knees-chest",
@@ -984,7 +1025,8 @@ window.STRETCHES = [
 "30,100 42,102 76,102 72,74 92,78 72,74 92,78 58,86 74,76 58,86 74,76"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "side-bend",
@@ -1019,7 +1061,8 @@ window.STRETCHES = [
 "116,24 110,34 100,64 96,87 94,110 104,87 106,110 108,14 126,6 118,48 120,62 104,50"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "cross-arm",
@@ -1052,7 +1095,8 @@ window.STRETCHES = [
 "100,20 100,32 100,64 96,87 94,110 104,87 106,110 92,40 74,40 114,50 94,42"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "triceps",
@@ -1085,7 +1129,8 @@ window.STRETCHES = [
 "100,20 100,32 100,64 96,87 94,110 104,87 106,110 110,12 100,30 90,20 106,10"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "doorway",
@@ -1118,7 +1163,11 @@ window.STRETCHES = [
 "122,24 122,36 116,66 130,88 138,110 104,88 96,110 116,36 116,20 120,52 120,66"
 ],
 "prop": "door:118",
-"kind": ""
+"kind": "",
+"equip": [
+"door"
+],
+"swap": "wall-chest"
 },
 {
 "id": "puppy",
@@ -1153,7 +1202,8 @@ window.STRETCHES = [
 "140,104 128,102 100,84 100,110 76,110 100,110 76,110 146,104 166,108 146,104 166,108"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "neck-side",
@@ -1187,7 +1237,8 @@ window.STRETCHES = [
 "90,23 100,32 100,64 96,87 94,110 104,87 106,110 92,50 86,66 114,22 94,14"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "deep-squat",
@@ -1224,7 +1275,8 @@ window.STRETCHES = [
 "112,46 106,58 90,92 118,80 104,110 118,80 104,110 112,76 120,64 112,76 120,64"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "worlds-greatest",
@@ -1262,7 +1314,8 @@ window.STRETCHES = [
 "138,60 130,72 104,90 136,84 140,110 76,106 50,108 136,92 138,110 132,52 134,32"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "happy-baby",
@@ -1298,7 +1351,8 @@ window.STRETCHES = [
 "30,102 42,104 76,104 64,82 84,56 64,82 84,56 62,74 84,58 62,74 84,58"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "ankle-circle",
@@ -1333,7 +1387,8 @@ window.STRETCHES = [
 "110,42 108,54 104,88 138,90 124,110 80,110 56,108 122,68 134,86 122,68 134,86"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "legs-wall",
@@ -1369,7 +1424,10 @@ window.STRETCHES = [
 "70,102 82,104 116,104 118,80 118,56 118,80 118,56 92,98 104,94 92,98 104,94"
 ],
 "prop": "wall:122",
-"kind": ""
+"kind": "",
+"equip": [
+"wall"
+]
 },
 {
 "id": "reclined-butterfly",
@@ -1404,7 +1462,8 @@ window.STRETCHES = [
 "30,102 42,104 76,104 96,94 102,104 92,88 102,104 54,96 64,94 54,96 64,94"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "wrist-flex",
@@ -1437,7 +1496,8 @@ window.STRETCHES = [
 "100,20 100,32 100,64 100,87 100,110 100,87 100,110 118,34 136,34 116,42 138,26"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "wrist-ext",
@@ -1470,7 +1530,8 @@ window.STRETCHES = [
 "100,20 100,32 100,64 100,87 100,110 100,87 100,110 118,34 136,34 116,42 138,44"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "side-child",
@@ -1506,7 +1567,8 @@ window.STRETCHES = [
 "128,98 118,98 86,98 110,110 82,110 110,110 82,110 142,110 160,114 142,110 160,114"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "banana",
@@ -1542,7 +1604,8 @@ window.STRETCHES = [
 "108,18 104,30 100,62 106,84 114,104 112,84 120,104 108,16 118,4 116,18 126,6 92,46"
 ],
 "prop": "top",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "levator",
@@ -1576,7 +1639,8 @@ window.STRETCHES = [
 "94,28 100,34 100,64 96,87 94,110 104,87 106,110 92,50 88,66 114,24 98,18"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "open-book",
@@ -1612,7 +1676,8 @@ window.STRETCHES = [
 "36,96 52,100 86,100 102,84 118,96 102,84 118,96 58,86 68,74 42,88 30,94"
 ],
 "prop": "",
-"kind": ""
+"kind": "",
+"equip": []
 },
 {
 "id": "leg-swing",
@@ -1647,7 +1712,10 @@ window.STRETCHES = [
 "100,20 100,32 100,64 100,87 100,110 112,84 128,98 110,44 122,40 96,48 94,62",
 "100,20 100,32 100,64 100,87 100,110 86,84 74,102 110,44 122,40 106,48 110,62"
 ],
-"prop": "wall:124"
+"prop": "wall:124",
+"equip": [
+"wall"
+]
 },
 {
 "id": "leg-swing-side",
@@ -1682,7 +1750,10 @@ window.STRETCHES = [
 "100,20 100,32 100,64 104,87 104,110 88,86 72,102 88,42 82,30 112,42 118,30",
 "100,20 100,32 100,64 96,87 96,110 116,84 134,96 88,42 82,30 112,42 118,30"
 ],
-"prop": ""
+"prop": "",
+"equip": [
+"wall"
+]
 },
 {
 "id": "ankle-circles",
@@ -1717,7 +1788,8 @@ window.STRETCHES = [
 "100,20 100,32 100,64 100,87 100,110 108,86 118,104 96,48 94,62 106,48 108,62",
 "100,20 100,32 100,64 100,87 100,110 108,86 112,108 96,48 94,62 106,48 108,62"
 ],
-"prop": ""
+"prop": "",
+"equip": []
 },
 {
 "id": "walking-lunge",
@@ -1753,7 +1825,8 @@ window.STRETCHES = [
 "100,20 100,32 100,64 100,87 100,110 100,87 100,110 92,48 98,62 92,48 98,62",
 "108,40 106,52 104,86 128,88 130,110 82,108 64,108 98,66 104,80 98,66 104,80"
 ],
-"prop": ""
+"prop": "",
+"equip": []
 },
 {
 "id": "knee-wall",
@@ -1789,7 +1862,10 @@ window.STRETCHES = [
 "108,40 106,52 98,86 124,86 128,110 78,110 56,108 112,66 120,84 112,66 120,84",
 "116,42 114,54 104,88 142,90 128,110 80,110 56,108 124,68 136,86 124,68 136,86"
 ],
-"prop": "wall:150"
+"prop": "wall:150",
+"equip": [
+"wall"
+]
 },
 {
 "id": "cossack",
@@ -1825,7 +1901,8 @@ window.STRETCHES = [
 "100,28 100,40 100,72 120,91 140,110 80,91 60,110 92,54 100,58 108,54 100,58",
 "128,56 126,68 128,96 150,86 140,110 98,104 56,110 136,74 144,66 120,76 140,66"
 ],
-"prop": ""
+"prop": "",
+"equip": []
 },
 {
 "id": "deficit-calf",
@@ -1859,7 +1936,11 @@ window.STRETCHES = [
 "116,4 116,16 116,48 118,70 120,92 116,70 118,92 126,30 140,40 126,30 140,40",
 "116,14 116,26 116,58 118,80 118,102 116,80 116,102 126,40 140,40 126,40 140,40"
 ],
-"prop": "step"
+"prop": "step",
+"equip": [
+"step"
+],
+"swap": "floor-calf-ecc"
 },
 {
 "id": "jefferson",
@@ -1894,7 +1975,11 @@ window.STRETCHES = [
 "100,20 100,32 100,64 100,87 100,110 100,87 100,110 100,48 102,64 100,48 102,64",
 "106,82 104,70 96,62 100,87 100,110 100,87 100,110 106,86 106,100 106,86 106,100 112,56"
 ],
-"prop": ""
+"prop": "",
+"equip": [
+"box"
+],
+"swap": "pike-lower"
 },
 {
 "id": "sl-rdl",
@@ -1930,7 +2015,8 @@ window.STRETCHES = [
 "100,20 100,32 100,64 102,87 100,110 100,87 100,110 100,48 102,64 100,48 102,64",
 "138,52 126,58 96,64 100,87 100,110 76,58 56,52 128,74 130,90 128,74 130,90"
 ],
-"prop": ""
+"prop": "",
+"equip": []
 },
 {
 "id": "tib-raise",
@@ -1965,7 +2051,10 @@ window.STRETCHES = [
 "62,18 62,30 64,62 72,86 80,110 72,86 80,110 66,46 68,60 66,46 68,60",
 "62,18 62,30 64,62 72,86 80,108 72,86 80,108 66,46 68,60 66,46 68,60"
 ],
-"prop": "wall:52"
+"prop": "wall:52",
+"equip": [
+"wall"
+]
 },
 {
 "id": "toe-mob",
@@ -1999,7 +2088,8 @@ window.STRETCHES = [
 "100,52 100,64 96,96 124,96 126,110 124,96 126,110 108,80 120,92 108,80 120,92",
 "100,52 100,64 96,96 124,96 128,106 124,96 128,106 108,80 120,92 108,80 120,92"
 ],
-"prop": ""
+"prop": "",
+"equip": []
 },
 {
 "id": "alsr-hold",
@@ -2033,7 +2123,8 @@ window.STRETCHES = [
 "30,102 42,104 76,104 100,104 124,104 100,104 124,104 54,106 68,106 54,106 68,106",
 "30,102 42,104 76,104 92,86 106,66 100,104 124,104 54,106 68,106 54,106 68,106"
 ],
-"prop": ""
+"prop": "",
+"equip": []
 },
 {
 "id": "kneel-lift",
@@ -2069,7 +2160,8 @@ window.STRETCHES = [
 "96,30 96,42 94,76 120,78 122,110 78,110 58,108 104,58 116,74 104,58 116,74",
 "98,26 98,38 98,72 124,76 124,110 80,104 58,108 106,56 118,72 106,56 118,72"
 ],
-"prop": ""
+"prop": "",
+"equip": []
 },
 {
 "id": "9090-lift",
@@ -2104,7 +2196,8 @@ window.STRETCHES = [
 "100,52 100,64 100,98 132,104 112,110 70,104 66,86 92,80 86,98 108,80 114,98",
 "98,52 98,64 100,98 132,104 112,110 70,98 62,78 92,80 86,98 108,80 114,98"
 ],
-"prop": ""
+"prop": "",
+"equip": []
 },
 {
 "id": "soleus-iso",
@@ -2138,7 +2231,10 @@ window.STRETCHES = [
 "134,40 126,52 106,80 134,94 136,110 100,98 82,110 146,52 158,48 146,52 158,48",
 "134,38 126,50 106,78 134,92 136,110 100,96 82,108 146,50 158,46 146,50 158,46"
 ],
-"prop": "wall:160"
+"prop": "wall:160",
+"equip": [
+"wall"
+]
 },
 {
 "id": "tspine-lift",
@@ -2172,7 +2268,8 @@ window.STRETCHES = [
 "142,80 134,84 98,84 98,110 74,110 98,110 74,110 134,97 134,110 128,96 140,90",
 "142,78 134,82 98,84 98,110 74,110 98,110 74,110 134,97 134,110 132,64 142,74"
 ],
-"prop": ""
+"prop": "",
+"equip": []
 },
 {
 "id": "breathing",
@@ -2206,6 +2303,152 @@ window.STRETCHES = [
 "130,100 118,104 80,106 56,106 32,106 56,106 32,106 126,100 140,104 126,100 140,104",
 "130,98 118,102 80,104 56,106 32,106 56,106 32,106 126,98 140,102 126,98 140,102"
 ],
-"prop": ""
+"prop": "",
+"equip": []
+},
+{
+"id": "floor-calf-ecc",
+"name": "Single-Leg Floor Calf Raise (slow lowering)",
+"area": [
+"calves"
+],
+"sides": true,
+"secs": 40,
+"icon": "🦶",
+"kind": "loaded",
+"swapOnly": true,
+"cue": "On flat ground with a fingertip on the wall, rise on both feet, lift one, and lower the working heel slowly over 3–6 seconds. No-step version of the deficit calf raise.",
+"focus": [
+"trail",
+"lower"
+],
+"order": 2,
+"setup": "Stand on flat ground facing a wall with your fingertips on it for balance.",
+"steps": [
+"Rise up onto the balls of both feet.",
+"Lift one foot off the floor.",
+"Lower the working heel slowly to the floor, taking 3–6 seconds (the app tells you the tempo).",
+"Put both feet down to rise again and repeat."
+],
+"feel": "Work in the calf and Achilles of the working leg, strongest as you lower.",
+"mistakes": "Dropping the heel quickly, or rolling onto the outer edge of the foot.",
+"easier": "Lower on both feet together.",
+"harder": "Slow the tempo, add a 2-second pause just above the floor, or bend the knee slightly for the soleus.",
+"perSide": "Do the left side, then the right. The timer runs each side separately with a 5-second switch.",
+"pose": [
+"120,4 120,16 120,48 120,70 122,92 112,72 102,84 132,30 150,34 132,30 150,34",
+"120,14 120,26 120,58 120,80 120,102 112,82 102,94 132,40 150,40 132,40 150,40"
+],
+"prop": "wall:152",
+"equip": []
+},
+{
+"id": "pike-lower",
+"name": "Standing Pike Roll-Down (bodyweight)",
+"area": [
+"hamstrings",
+"back"
+],
+"sides": false,
+"secs": 40,
+"icon": "🙇",
+"kind": "loaded",
+"swapOnly": true,
+"cue": "Feet together on the floor, legs straight, roll down slowly one vertebra at a time toward your toes, pause, and roll back up. No-box, no-weight Jefferson curl.",
+"focus": [
+"lower",
+"hipsback"
+],
+"order": 2,
+"setup": "Stand on the floor with your feet together and your arms hanging relaxed.",
+"steps": [
+"Tuck your chin.",
+"Roll down slowly, one vertebra at a time, letting your arms hang toward your toes.",
+"Keep the legs straight and pause at the bottom for one breath.",
+"Roll back up slowly from the bottom of the spine."
+],
+"feel": "The hamstrings and the whole back working at length.",
+"mistakes": "Rushing, or bending the knees a lot to reach lower.",
+"easier": "Roll down only halfway with soft knees.",
+"harder": "Slow the tempo, add a pause at the bottom, or do it on one leg with the other resting behind.",
+"perSide": "",
+"pose": [
+"100,20 100,32 100,64 100,87 100,110 100,87 100,110 100,48 102,64 100,48 102,64",
+"106,82 104,70 96,62 100,87 100,110 100,87 100,110 106,90 106,104 106,90 106,104 112,56"
+],
+"prop": "",
+"equip": []
+},
+{
+"id": "thigh-ham",
+"name": "Lying Hamstring (hands behind thigh)",
+"area": [
+"hamstrings"
+],
+"sides": true,
+"secs": 40,
+"icon": "🙌",
+"swapOnly": true,
+"cue": "On your back, hold behind one thigh with both hands and straighten that leg toward the ceiling. No strap needed.",
+"focus": [
+"trail",
+"lower",
+"sleep"
+],
+"order": 6,
+"setup": "Lie on your back with both knees bent and feet flat.",
+"steps": [
+"Lift one knee toward your chest.",
+"Clasp both hands behind that thigh.",
+"Slowly straighten the knee, pointing the foot to the ceiling.",
+"Keep the other foot on the floor or slide it out long."
+],
+"feel": "The back of the raised thigh.",
+"mistakes": "Pulling the thigh with the hands on the back of the knee, or lifting the head.",
+"easier": "Keep the raised knee bent.",
+"harder": "Straighten the bottom leg along the floor and flex the raised foot.",
+"perSide": "Do the left side, then the right. The timer runs each side separately with a 5-second switch.",
+"pose": [
+"30,102 42,104 76,104 86,80 104,74 92,80 108,104 60,90 82,84 60,90 82,84",
+"30,102 42,104 76,104 82,82 88,58 92,80 108,104 60,88 80,80 60,88 80,80"
+],
+"prop": "",
+"kind": "",
+"equip": []
+},
+{
+"id": "wall-chest",
+"name": "Wall Chest Stretch",
+"area": [
+"shoulders"
+],
+"sides": true,
+"secs": 30,
+"icon": "🧱",
+"swapOnly": true,
+"cue": "Stand side-on to a wall, palm and forearm flat on it at shoulder height, and turn your chest gently away. No doorframe needed.",
+"focus": [
+"upper"
+],
+"order": 2,
+"setup": "Stand side-on to a wall, an arm's length away.",
+"steps": [
+"Place the palm and forearm of the near arm flat on the wall at shoulder height.",
+"Keep the shoulder down.",
+"Turn your feet and chest slowly away from the wall.",
+"Hold where the front of the chest and shoulder open."
+],
+"feel": "Across the chest and the front of the shoulder.",
+"mistakes": "Turning so far that the shoulder pinches, or shrugging.",
+"easier": "Turn only a little, with the arm lower.",
+"harder": "Raise the arm slightly higher on the wall.",
+"perSide": "Do the left side, then the right. The timer runs each side separately with a 5-second switch.",
+"pose": [
+"100,22 100,34 100,66 102,88 104,110 98,88 96,110 116,34 116,18 98,50 98,64",
+"102,22 102,34 100,66 104,88 108,110 96,88 92,110 116,34 116,18 94,50 92,64"
+],
+"prop": "wall:118",
+"kind": "",
+"equip": []
 }
 ];

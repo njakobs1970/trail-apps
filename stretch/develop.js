@@ -39,9 +39,10 @@ function holdSteps(ex,list,extra={}){ // list of {secs,phase,type?}; repeats per
   const one=side=>list.map(x=>({type:x.type||'hold',secs:x.secs,ex,side,phase:x.phase,...extra}));
   return ex.sides?[...one('Left'),{type:'switch',secs:SW,next:ex,label:'Switch sides'},...one('Right')]:one(null);
 }
-function build(type,dev,lib,{now=Date.now(),k}={}){
-  if(type==='develop'&&k==null){let r=build(type,dev,lib,{now,k:3});if(r.total>1500)r=build(type,dev,lib,{now,k:2});return r}
-  const L=Object.fromEntries(lib.map(s=>[s.id,s]));const blocks=[];const deload=isDeload(dev,now);
+function build(type,dev,lib,{now=Date.now(),k,avail=null}={}){
+  if(type==='develop'&&k==null){let r=build(type,dev,lib,{now,k:3,avail});if(r.total>1500)r=build(type,dev,lib,{now,k:2,avail});return r}
+  const G=root.Gen||require('./generator.js');const hasW=!avail||avail.includes('weight');
+  const L0=Object.fromEntries(lib.map(s=>[s.id,s]));const L=new Proxy(L0,{get:(o,id)=>{const s=o[id];if(!s)return s;const r=G.resolve(s,lib,avail)||s;return r!==s?{...r,swappedFrom:s.name}:r}});const blocks=[];const deload=isDeload(dev,now);
   const add=(name,kind,ex,steps,note,rate)=>blocks.push({name,kind,ex,steps,note,rate});
   if(type==='prerun'){
     for(const id of PRE_RUN){const ex=L[id];add('Dynamic warm-up','warmup',ex,holdSteps(ex,[{secs:ex.secs,phase:'Keep moving'}]),`${ex.secs}s${ex.sides?' each side':''} · dynamic`)}
@@ -57,13 +58,13 @@ function build(type,dev,lib,{now=Date.now(),k}={}){
       const rounds=Math.max(1,Math.round(p.rounds*Math.min(v,1.25))),fin=Math.max(30,Math.round(p.final*(deload?0.6:1)));
       const seq=[];for(let r=0;r<rounds;r++)seq.push({secs:5,phase:`Contract ~30% (${r+1}/${rounds})`,type:'contract'},{secs:2,phase:'Relax, breathe out',type:'relax'},{secs:25,phase:`Sink deeper (${r+1}/${rounds})`});
       seq.push({secs:fin,phase:'Final hold'});
-      add('2 · PNF: '+AREAS[a].name,'pnf',ex,holdSteps(ex,seq,{area:a}),`PNF ${rounds}×(5s contract · 2s relax · 25s deeper) + ${fin}s final${ex.sides?' · each side':''}`,{kind:'pnf',area:a})}
+      add('2 · PNF: '+AREAS[a].name,'pnf',ex,holdSteps(ex,seq,{area:a}),`PNF ${rounds}×(5s contract · 2s relax · 25s deeper) + ${fin}s final${ex.sides?' · each side':''}`,{kind:'pnf',area:a,bw:!hasW||!!(AREAS[a].loaded&&L[AREAS[a].loaded].swappedFrom)})}
     for(const a of dev.maint.slice(0,1)){const ex=L[AREAS[a].pnf[Math.min(prog(dev,a).level,AREAS[a].pnf.length-1)]];add('2 · Maintenance: '+AREAS[a].name,'topup',ex,holdSteps(ex,[{secs:45,phase:'Maintenance hold'}],{area:a}),'45s maintenance hold')}
     const loadedIds=[...new Set(today.map(a=>(prog(dev,a).loadSteps>=3&&AREAS[a].alt)||AREAS[a].loaded).filter(Boolean))].slice(0,1);
-    for(const id of loadedIds){const ex=L[id];const kg=dev.loads[id]||0;const sets=deload?1:2;const seq=[];for(let s=0;s<sets;s++){seq.push({secs:40,phase:`Slow lowering · set ${s+1}/${sets}${kg?' · '+kg+' kg':''}`});if(s<sets-1)seq.push({secs:15,phase:'Rest',type:'relax'})}
-      add('3 · Loaded / slow lowering','loaded',ex,holdSteps(ex,seq,{area:areaOf(ex),kg}),`${sets}×40s slow lowering${ex.sides?' each side':''} · ${kg} kg`,{kind:'loaded',ex:id})}
+    for(const id0 of loadedIds){const ex=L[id0],id=ex.id;const bw=!hasW||!!ex.swappedFrom;const kg=bw?0:(dev.loads[id]||0);const tempo=(dev.tempo||{})[id]||3;const sets=deload?1:2;const seq=[];for(let s=0;s<sets;s++){seq.push({secs:40,phase:`Slow lowering${bw?' '+tempo+' s down'+((dev.pauseBottom||{})[id]?' + 2 s pause':''):''} · set ${s+1}/${sets}${kg?' · '+kg+' kg':''}`});if(s<sets-1)seq.push({secs:15,phase:'Rest',type:'relax'})}
+      add('3 · Loaded / slow lowering','loaded',ex,holdSteps(ex,seq,{area:areaOf(ex),kg}),`${sets}×40s slow lowering${ex.sides?' each side':''} · ${bw?'bodyweight, '+tempo+' s lowering':kg+' kg'}`,{kind:'loaded',ex:id,bw})}
     const ends=[...new Set(today.map(a=>AREAS[a].end))].slice(0,1);
-    for(const id of ends){const ex=L[id];const h=dev.endHold[id]||20;const reps=deload?1:2;const seq=[];for(let r=0;r<reps;r++){seq.push({secs:h,phase:`Hold at end range (${r+1}/${reps})`});if(r<reps-1)seq.push({secs:10,phase:'Rest',type:'relax'})}
+    for(const id0 of ends){const ex=L[id0],id=ex.id;const h=dev.endHold[id]||20;const reps=deload?1:2;const seq=[];for(let r=0;r<reps;r++){seq.push({secs:h,phase:`Hold at end range (${r+1}/${reps})`});if(r<reps-1)seq.push({secs:10,phase:'Rest',type:'relax'})}
       add('4 · End-range strength','endrange',ex,holdSteps(ex,seq,{area:areaOf(ex)}),`${reps}×${h}s holds${ex.sides?' each side':''}`,{kind:'endrange',ex:id})}
     add('5 · Breathing','breath',L.breathing,holdSteps(L.breathing,[{secs:120,phase:'Slow breathing: 4 in, 6 out'}]),'2 min');
   }
@@ -71,7 +72,7 @@ function build(type,dev,lib,{now=Date.now(),k}={}){
   const steps=[];const items=[];
   blocks.forEach((b,i)=>{if(i>0)steps.push({type:'transition',secs:type==='develop'?5:TR,next:b.ex,label:'Get ready'});steps.push(...b.steps.map(s=>({...s,block:b.name})));
     if(b.rate)steps.push({type:'rate',secs:0,rate:b.rate,ex:b.ex,block:b.name});
-    items.push({...b.ex,hold:b.steps.find(s=>s.type==='hold').secs,planNote:b.note,block:b.name,kg:b.steps[0].kg});});
+    items.push({...b.ex,bw:b.rate&&b.rate.bw,hold:b.steps.find(s=>s.type==='hold').secs,planNote:b.note,block:b.name,kg:b.steps[0].kg});});
   return {items,steps,type,focus:type==='prerun'?'trail':null,deload,week:weekIndex(dev,now),areasToday:type==='develop'?blocks.filter(b=>b.kind==='pnf').map(b=>b.rate.area):[],total:steps.reduce((a,x)=>a+x.secs,0)};
 }
 function nextRotation(dev,used=3){dev.rotate=((dev.rotate||0)+Math.min(used,dev.areas.length))%Math.max(1,dev.areas.length)}
@@ -84,9 +85,11 @@ function applyRating(dev,rate,rating,pain,now=Date.now()){
     else if(easy){
       if(p.final<90){p.final=Math.min(90,p.final+15);msg=`final hold now ${p.final}s`}
       else if(p.rounds<5){p.rounds++;msg=`PNF rounds now ${p.rounds}`}
-      else if(ld&&p.loadSteps<3){dev.loads[ld]=(dev.loads[ld]||0)+1;p.loadSteps++;msg=`+1 kg on ${ld}`}
+      else if(ld&&p.loadSteps<3){p.loadSteps++;if(rate.bw){msg=bwUp(dev,BW[ld]||ld)}else{dev.loads[ld]=(dev.loads[ld]||0)+1;msg=`+1 kg on ${ld}`}}
       else if(p.level<max){p.level++;p.final=45;p.rounds=3;p.loadSteps=0;msg='moved to a harder variation'}
       else msg='at the top of the ladder; holding steady'}
+  } else if(rate.kind==='loaded'&&rate.bw){const id=rate.ex;dev.tempo=dev.tempo||{};dev.pauseBottom=dev.pauseBottom||{};
+    if(hard){if(dev.pauseBottom[id]){dev.pauseBottom[id]=false;msg='bottom pause removed'}else{dev.tempo[id]=Math.max(2,(dev.tempo[id]||3)-1);msg=`lowering tempo ${dev.tempo[id]} s`}}else if(easy)msg=bwUp(dev,id);
   } else if(rate.kind==='loaded'){const id=rate.ex;
     if(hard){dev.loads[id]=Math.max(0,(dev.loads[id]||0)-1);msg=`load down to ${dev.loads[id]} kg`}
     else if(easy){dev.loads[id]=(dev.loads[id]||0)+1;msg=`load up to ${dev.loads[id]} kg`}
@@ -96,6 +99,11 @@ function applyRating(dev,rate,rating,pain,now=Date.now()){
   return msg;
 }
 
+const BW={'deficit-calf':'floor-calf-ecc',jefferson:'pike-lower'};
+function bwUp(dev,id){dev.tempo=dev.tempo||{};dev.pauseBottom=dev.pauseBottom||{};const t=dev.tempo[id]||3;
+  if(t<6){dev.tempo[id]=t+1;return `bodyweight: lowering tempo now ${t+1} s`}
+  if(!dev.pauseBottom[id]){dev.pauseBottom[id]=true;return 'bodyweight: add a 2 s pause at the bottom'}
+  return 'bodyweight: at max tempo; next step is a harder variation (single-leg / off a step when available)'}
 // Progress tests every 3 weeks
 function testDue(dev,now=Date.now()){const t=dev.tests[dev.tests.length-1];return !t||now-new Date(t.date).getTime()>=21*864e5}
 function metricMet(k,v){const T=TESTS[k];if(v==null||v==='')return null;return T.unit==='pass'?!!v:v>=T.target}

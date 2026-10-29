@@ -45,9 +45,19 @@ function fullDesc(s){
 }
 // ---------- Plan ----------
 function newRoutine(){const t=settings.type;
-  if(['develop','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES);
-  else routine=Gen.generate(STRETCHES,{targetSec:(t==='relax'?15:settings.minutes)*60,focus:t==='relax'?'sleep':settings.focus});
+  if(['develop','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES,{avail:Gen.availOf(settings)});
+  else routine=Gen.generate(STRETCHES,{targetSec:(t==='relax'?15:settings.minutes)*60,focus:t==='relax'?'sleep':settings.focus,avail:Gen.availOf(settings)});
   routine.type=t;routine.label=TYPES[t]+(t==='random'?' · '+Gen.FOCUSES[routine.focus]:t==='relax'?' · sleep & relaxation':'');renderPlan()}
+function renderEquip(){
+  const need=new Set();routine.items.forEach(i=>Gen.equipFor(i,i.bw?0:i.kg).forEach(e=>need.add(e)));
+  const kgs=routine.items.filter(i=>i.kind==='loaded'&&!i.bw&&i.kg>0).map(i=>`${i.kg} kg`);
+  const list=[...need].map(e=>Gen.EQUIP[e]+(e==='weight'&&kgs.length?' ('+[...new Set(kgs)].join(', ')+')':'')+(Gen.FREE.includes(e)?' <small style="display:inline">(always available)</small>':''));
+  const sw=routine.items.filter(i=>i.swappedFrom).map(i=>`${esc(i.swappedFrom)} → ${esc(i.name)}`);
+  $('#equipList').innerHTML=need.size?'<b>Equipment needed:</b> '+list.join(' · '):'<b>No equipment needed</b>';
+  $('#equipSwaps').innerHTML=sw.length?'No-equipment swaps: '+sw.join('; '):'';
+  document.querySelectorAll('.noEquip').forEach(c=>c.checked=!!settings.noEquip);
+  $('#ownList').innerHTML=Gen.OWNABLE.map(k=>`<label class="chk"><input type=checkbox data-own="${k}" ${(settings.owned||Gen.OWNABLE).includes(k)?'checked':''}> ${Gen.EQUIP[k]}</label>`).join('');
+}
 function renderDev(){
   const isDev=['develop','topup'].includes(settings.type);$('#devBox').hidden=!isDev;$('#focusBox').hidden=settings.type!=='random';$('#lenBox').hidden=settings.type!=='random';
   document.querySelectorAll('#todayChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===settings.today));
@@ -58,14 +68,14 @@ function renderDev(){
   const ws=Dev.weekSecs(dev);
   $('#areaPick').innerHTML=Object.entries(Dev.AREAS).map(([k,a])=>`<label class="chk"><input type=checkbox data-a="${k}" ${dev.areas.includes(k)?'checked':''}> ${a.name}${a.secondary?' <small style="display:inline">(secondary)</small>':''}${dev.maint.includes(k)?' <small style="display:inline">· maintenance</small>':''}</label>`).join('');
   $('#weekBars').innerHTML=dev.areas.concat(dev.maint).map(a=>{const v=ws[a]||0;return `<div class="wk"><span>${Dev.AREAS[a].name}</span><span>${Math.round(v/60)}/${10}–15 min</span><div class="bar"><div style="width:${Math.min(100,v/9)}%"></div><i style="left:${600/9}%"></i></div></div>`}).join('');
-  const loads=[...new Set(routine.items.filter(i=>i.kind==='loaded').map(i=>i.id))];
+  const loads=[...new Set(routine.items.filter(i=>i.kind==='loaded'&&!i.bw).map(i=>i.id))];
   $('#loads').innerHTML=loads.map(id=>`<label>${STRETCHES.find(x=>x.id===id).name} load <input type=number min=0 step=0.5 data-load="${id}" value="${dev.loads[id]||0}" style="width:5em"> kg</label>`).join('');
   $('#devNote').textContent=`Week ${routine.week}${routine.deload?' · DELOAD week (volume cut ~40%)':''}${routine.areasToday&&routine.areasToday.length?' · PNF today: '+routine.areasToday.map(a=>Dev.AREAS[a].name).join(', '):''}`;
 }
 function renderPlan(){
   $('#planTotal').textContent=fmt(Gen.totalSec(routine.steps));
   $('#planCount').textContent=routine.items.length;
-  $('#planFocus').textContent=routine.label;renderDev();
+  $('#planFocus').textContent=routine.label;renderDev();renderEquip();
   document.querySelectorAll('#focusChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===settings.focus));
   let lastB='';$('#planList').innerHTML=routine.items.map((s,i)=>`${s.block&&s.block!==lastB?`<li class="blk">${esc(lastB=s.block)}</li>`:''}<li><details><summary><span class=ic>${s.icon}</span><div><b>${i+1}. ${esc(s.name)}</b><small>${s.planNote?esc(s.planNote):`${s.sides?'L + R · ':''}${s.hold}s${s.sides?' each':''} · ${s.area.join(', ')}`}</small><span class="sum">${esc(s.cue)}</span></div></summary>${demoSVG(s,'demo small')}${fullDesc(s)}</details></li>`).join('');
 }
@@ -93,7 +103,7 @@ function enterStep(i){
   $('#pNext').textContent=nxt?`Next up: ${nxt.ex.name}${nxt.side?' ('+nxt.side+')':''}`:'Last one!';
   $('#backBtnP').disabled=i===0;
   beep(st.type==='hold'?880:st.type==='contract'?740:520,st.type==='hold'?0.3:0.15);
-  if(ex.kg!=null&&st.type!=='rate')$('#pName').textContent=ex.icon+' '+ex.name+' · '+(dev.loads[ex.id]||0)+' kg';
+  if(st.kg>0&&st.type!=='rate')$('#pName').textContent=ex.icon+' '+ex.name+' · '+st.kg+' kg';
 }
 let lastCount=null;
 function tick(){
@@ -151,6 +161,8 @@ function bindSettings(){
   $('#typeChips').onclick=e=>{const b=e.target.closest('button');if(!b)return;settings.type=b.dataset.t;save();newRoutine()};
   $('#areaPick').onchange=e=>{const a=e.target.dataset.a;if(!a)return;let ar=dev.areas.filter(x=>x!==a);if(e.target.checked)ar.push(a);
     if(ar.length<3||ar.length>4){e.target.checked=!e.target.checked;$('#areaMsg').textContent='Pick 3–4 priority areas.';return}$('#areaMsg').textContent='';dev.areas=ar;dev.maint=dev.maint.filter(x=>x!==a);dev.rotate=0;saveDev();newRoutine()};
+  document.querySelectorAll('.noEquip').forEach(c=>c.onchange=()=>{settings.noEquip=c.checked;save();newRoutine()});
+  $('#ownList').onchange=e=>{const k=e.target.dataset.own;if(!k)return;const o=new Set(settings.owned||Gen.OWNABLE);e.target.checked?o.add(k):o.delete(k);settings.owned=[...o];save();newRoutine()};
   $('#loads').onchange=e=>{const id=e.target.dataset.load;if(!id)return;dev.loads[id]=Math.max(0,Number(e.target.value)||0);saveDev();newRoutine()};
   ['#scName','#autoLog'].forEach(s=>$(s).addEventListener('change',save));
 }

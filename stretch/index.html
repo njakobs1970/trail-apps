@@ -9,6 +9,7 @@
  <header><h1>Stretch 15</h1><span><button id="testsBtn" class="ghost">Tests</button> <button id="histBtn" class="ghost">History</button></span></header>
  <button id="testDue" class="ghost due" hidden>📏 Progress test due — tap to record</button>
  <div><small>Today</small><div id="todayChips" class="chips" role="group" aria-label="Today"></div></div>
+ <label class="chk toggle"><input type=checkbox class="noEquip" id="noEquipTop"> No equipment (wall &amp; floor only)</label>
  <div><small>Session</small><div id="typeChips" class="chips" role="group" aria-label="Session type"></div></div>
  <p id="guide" class="muted"></p>
  <div class="card row"><div><big id="planTotal">15:00</big><small><span id="planCount"></span> stretches</small></div>
@@ -20,6 +21,9 @@
   <p id="devNote" class="muted"></p><div id="weekBars"></div>
   <small>Priority areas (pick 3–4)</small><div id="areaPick"></div><p id="areaMsg" class="muted"></p>
   <div id="loads"></div></details>
+ <div id="equipPanel" class="card"><div id="equipList"></div><small id="equipSwaps"></small>
+  <label class="chk"><input type=checkbox class="noEquip" id="noEquipPanel"> Switch to the no-equipment version</label>
+  <details><summary>Equipment I own</summary><div id="ownList"></div><small>Moves needing anything unticked are swapped automatically for bodyweight versions.</small></details></div>
  <p class="muted">Your routine (<span id="planFocus"></span>). Tap a stretch for the full how-to and demo.</p>
  <ol id="planList" class="list"></ol>
  <details class="card"><summary>Apple Health logging</summary>
