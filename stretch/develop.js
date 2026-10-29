@@ -1,7 +1,7 @@
 // Develop / Top-up / Pre-run session builder, progression rules and progress-test analysis.
 // Pure functions (no DOM) so they run in Node tests. State object "dev" lives in localStorage.
 (function(root){
-const TR=8, SW=5;
+const TR=30, SW=5; // TR = default rest between exercises; overridable via build(...,{rest})
 const AREAS={
   calves:   {name:'Calves/soleus & ankle',pnf:['calf-wall','soleus','step-calf'],loaded:'deficit-calf',end:'soleus-iso',tests:['ktwL','ktwR']},
   hamstrings:{name:'Hamstrings',pnf:['supine-ham','standing-ham','seated-fold'],loaded:'jefferson',alt:'sl-rdl',end:'alsr-hold',tests:['sar','aslrL','aslrR']},
@@ -39,13 +39,15 @@ function holdSteps(ex,list,extra={}){ // list of {secs,phase,type?}; repeats per
   const one=side=>list.map(x=>({type:x.type||'hold',secs:x.secs,ex,side,phase:x.phase,...extra}));
   return ex.sides?[...one('Left'),{type:'switch',secs:SW,next:ex,label:'Switch sides'},...one('Right')]:one(null);
 }
-function build(type,dev,lib,{now=Date.now(),k,avail=null}={}){
-  if(type==='develop'&&k==null){let r=build(type,dev,lib,{now,k:3,avail});if(r.total>1500)r=build(type,dev,lib,{now,k:2,avail});return r}
+function build(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0}={}){
+  // Fit to the time budget instead of running long: Develop drops a PNF area (3 -> 2 -> 1), Pre-run drops trailing drills.
+  if(type==='develop'&&k==null){let r;for(const kk of [3,2,1]){r=build(type,dev,lib,{now,k:kk,avail,rest});if(r.total<=1500)break}return r}
+  if(type==='prerun'&&!drop){let r,dd=0;do{r=build(type,dev,lib,{now,avail,rest,drop:dd||-1});dd++}while(r.total>480&&PRE_RUN.length-dd>=4);return r}
   const G=root.Gen||require('./generator.js');const hasW=!avail||avail.includes('weight');
   const L0=Object.fromEntries(lib.map(s=>[s.id,s]));const L=new Proxy(L0,{get:(o,id)=>{const s=o[id];if(!s)return s;const r=G.resolve(s,lib,avail)||s;return r!==s?{...r,swappedFrom:s.name}:r}});const blocks=[];const deload=isDeload(dev,now);
   const add=(name,kind,ex,steps,note,rate)=>blocks.push({name,kind,ex,steps,note,rate});
   if(type==='prerun'){
-    for(const id of PRE_RUN){const ex=L[id];add('Dynamic warm-up','warmup',ex,holdSteps(ex,[{secs:ex.secs,phase:'Keep moving'}]),`${ex.secs}s${ex.sides?' each side':''} · dynamic`)}
+    for(const id of (drop>0?PRE_RUN.slice(0,PRE_RUN.length-drop):PRE_RUN)){const ex=L[id];add('Dynamic warm-up','warmup',ex,holdSteps(ex,[{secs:ex.secs,phase:'Keep moving'}]),`${ex.secs}s${ex.sides?' each side':''} · dynamic`)}
   } else if(type==='topup'){
     for(const a of dev.areas.concat(dev.maint)){const p=prog(dev,a),ex=L[AREAS[a].pnf[Math.min(p.level,AREAS[a].pnf.length-1)]];const h=deload?40:60;
       add(AREAS[a].name,'topup',ex,holdSteps(ex,[{secs:h,phase:'Hold & breathe'}],{area:a}),`${h}s hold${ex.sides?' each side':''}`)}
@@ -70,7 +72,7 @@ function build(type,dev,lib,{now=Date.now(),k,avail=null}={}){
   }
   // flatten with transitions; a 0-10 rating step after each rated block
   const steps=[];const items=[];
-  blocks.forEach((b,i)=>{if(i>0)steps.push({type:'transition',secs:type==='develop'?5:TR,next:b.ex,label:'Get ready'});steps.push(...b.steps.map(s=>({...s,block:b.name})));
+  blocks.forEach((b,i)=>{if(i>0)steps.push({type:'transition',secs:rest,next:b.ex,label:'Get ready'});steps.push(...b.steps.map(s=>({...s,block:b.name})));
     if(b.rate)steps.push({type:'rate',secs:0,rate:b.rate,ex:b.ex,block:b.name});
     items.push({...b.ex,bw:b.rate&&b.rate.bw,hold:b.steps.find(s=>s.type==='hold').secs,planNote:b.note,block:b.name,kg:b.steps[0].kg});});
   return {items,steps,type,focus:type==='prerun'?'trail':null,deload,week:weekIndex(dev,now),areasToday:type==='develop'?blocks.filter(b=>b.kind==='pnf').map(b=>b.rate.area):[],total:steps.reduce((a,x)=>a+x.secs,0)};

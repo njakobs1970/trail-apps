@@ -1,6 +1,6 @@
 // Pure routine generator (also usable from Node for tests).
 (function(root){
-const TRANSITION=8, SWITCH=5;
+const REST_DEFAULT=30, SWITCH=5; // rest/transition between stretches (setting: 15/30/45/60 s)
 const FOCUSES={trail:'Trail running',sleep:'Sleep & relaxation',upper:'Upper body',lower:'Lower body',hipsback:'Hips & lower back',full:'Full body / random'};
 const LEGACY={balanced:'full',legs:'lower',upper:'upper'}; // old "bias" setting values
 function normFocus(f){f=LEGACY[f]&&!FOCUSES[f]?LEGACY[f]:f;return FOCUSES[f]?f:'full'}
@@ -15,7 +15,8 @@ function fits(s,avail,kg){return !avail||equipFor(s,0).every(x=>avail.includes(x
 function resolve(s,lib,avail){let n=0;while(s&&!fits(s,avail)&&s.swap&&n++<4)s=lib.find(x=>x.id===s.swap)||null;return s&&fits(s,avail)?s:null}
 function pickWeighted(pool, w){let t=pool.reduce((a,s)=>a+w(s),0),r=Math.random()*t;for(const s of pool){r-=w(s);if(r<=0)return s}return pool[pool.length-1]}
 function cost(s,h){return (s.sides? 2*h + SWITCH : h)}
-function generate(lib,{targetSec=900,focus,bias,avail=null}={}){
+function generate(lib,{targetSec=900,focus,bias,avail=null,rest=REST_DEFAULT}={}){
+  const TRANSITION=rest;
   const all=lib;
   focus=normFocus(focus||bias||'full');
   // Sleep: longer, slower holds so there are fewer, calmer stretches.
@@ -39,17 +40,17 @@ function generate(lib,{targetSec=900,focus,bias,avail=null}={}){
   const holdSum=chosen.reduce((a,s)=>a+(s.sides?2:1)*base(s),0);
   const k=(targetSec-fixed)/holdSum;
   const items=chosen.map(s=>({...s,hold:Math.max(20,Math.round(base(s)*k))}));
-  return {items,steps:toSteps(items),focus};
+  return {items,steps:toSteps(items,rest),focus};
 }
-function toSteps(items){
+function toSteps(items,rest=REST_DEFAULT){
   const steps=[];
   items.forEach((s,i)=>{
-    if(i>0)steps.push({type:'transition',secs:TRANSITION,next:s,label:'Get ready'});
+    if(i>0)steps.push({type:'transition',secs:rest,next:s,label:'Get ready'});
     if(s.sides){steps.push({type:'hold',secs:s.hold,ex:s,side:'Left'});steps.push({type:'switch',secs:SWITCH,next:s,label:'Switch sides'});steps.push({type:'hold',secs:s.hold,ex:s,side:'Right'});}
     else steps.push({type:'hold',secs:s.hold,ex:s,side:null});
   });return steps;
 }
 const totalSec=steps=>steps.reduce((a,s)=>a+s.secs,0);
-const api={generate,toSteps,totalSec,FOCUSES,normFocus,EQUIP,FREE,OWNABLE,equipFor,availOf,fits,resolve};
+const api={REST_DEFAULT,generate,toSteps,totalSec,FOCUSES,normFocus,EQUIP,FREE,OWNABLE,equipFor,availOf,fits,resolve};
 if(typeof module!=='undefined')module.exports=api;else root.Gen=api;
 })(this);

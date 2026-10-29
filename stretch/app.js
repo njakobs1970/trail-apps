@@ -3,7 +3,7 @@ const params=new URLSearchParams(location.search);
 const SPEED=Number(params.get('speed'))||1; // test hook: ?speed=50 runs 50x faster
 const LS={get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
 let settings=LS.get('settings',{minutes:15,focus:'trail',type:'develop',today:'rest',shortcut:'Log Stretch',autoLog:true});
-settings.focus=Gen.normFocus(settings.focus||settings.bias||'trail');delete settings.bias;settings.type=settings.type||'develop';settings.today=settings.today||'rest';
+settings.focus=Gen.normFocus(settings.focus||settings.bias||'trail');delete settings.bias;settings.type=settings.type||'develop';settings.rest=settings.rest||30;settings.today=settings.today||'rest';
 let dev=LS.get('dev',null)||Dev.fresh();const saveDev=()=>LS.set('dev',dev);
 const TYPES={prerun:'Pre-run warm-up',develop:'Develop',topup:'Top-up',relax:'Relax',random:'Random'};
 const TODAY={prerun:['Pre-run','prerun','Dynamic warm-up only (5–8 min). No long static holds or PNF before running.'],postrun:['Post-run','develop','Muscles are warm: Develop (20–25 min) or a Top-up (8–10 min).'],longrun:['Long run done','relax','After a long run, keep it gentle: Relax.'],rest:['Rest day','develop','Rest day: a full Develop session.']};
@@ -45,8 +45,8 @@ function fullDesc(s){
 }
 // ---------- Plan ----------
 function newRoutine(){const t=settings.type;
-  if(['develop','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES,{avail:Gen.availOf(settings)});
-  else routine=Gen.generate(STRETCHES,{targetSec:(t==='relax'?15:settings.minutes)*60,focus:t==='relax'?'sleep':settings.focus,avail:Gen.availOf(settings)});
+  if(['develop','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES,{avail:Gen.availOf(settings),rest:settings.rest||30});
+  else routine=Gen.generate(STRETCHES,{targetSec:(t==='relax'?15:settings.minutes)*60,focus:t==='relax'?'sleep':settings.focus,avail:Gen.availOf(settings),rest:settings.rest||30});
   routine.type=t;routine.label=TYPES[t]+(t==='random'?' · '+Gen.FOCUSES[routine.focus]:t==='relax'?' · sleep & relaxation':'');renderPlan()}
 function renderEquip(){
   const need=new Set();routine.items.forEach(i=>Gen.equipFor(i,i.bw?0:i.kg).forEach(e=>need.add(e)));
@@ -150,7 +150,7 @@ function renderHistory(){
 }
 // ---------- Wiring ----------
 function bindSettings(){
-  $('#minutes').value=settings.minutes;$('#scName').value=settings.shortcut;$('#autoLog').checked=settings.autoLog;
+  $('#minutes').value=settings.minutes;$('#rest').value=settings.rest||30;$('#rest').onchange=()=>{settings.rest=Number($('#rest').value);save();newRoutine()};$('#scName').value=settings.shortcut;$('#autoLog').checked=settings.autoLog;
   const save=()=>{settings={...settings,minutes:Number($('#minutes').value),shortcut:$('#scName').value.trim()||'Log Stretch',autoLog:$('#autoLog').checked};LS.set('settings',settings)};
   $('#minutes').addEventListener('change',()=>{save();newRoutine()});
   $('#focusChips').innerHTML=Object.entries(Gen.FOCUSES).map(([k,v])=>`<button type=button data-f="${k}">${v}</button>`).join('');
