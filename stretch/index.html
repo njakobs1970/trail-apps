@@ -6,11 +6,21 @@
 <link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" href="icon.svg">
 <title>Stretch 15</title><link rel="stylesheet" href="style.css"></head><body>
 <section id="home">
- <header><h1>Stretch 15</h1><button id="histBtn" class="ghost">History</button></header>
+ <header><h1>Stretch 15</h1><span><button id="testsBtn" class="ghost">Tests</button> <button id="histBtn" class="ghost">History</button></span></header>
+ <button id="testDue" class="ghost due" hidden>📏 Progress test due — tap to record</button>
+ <div><small>Today</small><div id="todayChips" class="chips" role="group" aria-label="Today"></div></div>
+ <div><small>Session</small><div id="typeChips" class="chips" role="group" aria-label="Session type"></div></div>
+ <p id="guide" class="muted"></p>
  <div class="card row"><div><big id="planTotal">15:00</big><small><span id="planCount"></span> stretches</small></div>
   <button id="regen" class="ghost" aria-label="Regenerate">↻ New routine</button></div>
- <div class="opts"><label>Length <select id="minutes"><option>10</option><option>15</option><option>20</option><option>25</option></select> min</label>
-  <label>Focus <select id="bias"><option value="balanced">Balanced</option><option value="legs">Legs &amp; hips</option><option value="upper">Back &amp; shoulders</option></select></label></div>
+ <div class="opts" id="lenBox"><label>Length <select id="minutes"><option>10</option><option>15</option><option>20</option><option>25</option></select> min</label>
+</div>
+ <div id="focusBox"><small>Focus (trail running first; others secondary)</small><div id="focusChips" class="chips" role="group" aria-label="Focus"></div></div>
+ <details id="devBox" class="card"><summary>Develop: priority areas, weekly progress, loads</summary>
+  <p id="devNote" class="muted"></p><div id="weekBars"></div>
+  <small>Priority areas (pick 3–4)</small><div id="areaPick"></div><p id="areaMsg" class="muted"></p>
+  <div id="loads"></div></details>
+ <p class="muted">Your routine (<span id="planFocus"></span>). Tap a stretch for the full how-to and demo.</p>
  <ol id="planList" class="list"></ol>
  <details class="card"><summary>Apple Health logging</summary>
   <label>Shortcut name <input id="scName"></label>
@@ -21,14 +31,24 @@
 </section>
 <section id="player" hidden>
  <div class="top"><span id="pStep"></span><span id="pTotal"></span></div>
- <div id="pPhase"></div><div id="pIcon" class="bigicon"></div><h2 id="pName"></h2>
- <div id="pTime" class="timer">0:00</div><div class="bar"><div id="pBar"></div></div>
- <p id="pCue" class="cue"></p><p id="pNext" class="muted"></p>
- <div class="controls"><button id="stopBtn" class="ghost">End</button><button id="pauseBtn" class="primary">Pause</button><button id="skipBtn" class="ghost">Skip ›</button></div>
+ <div id="pPhase"></div><h2 id="pName"></h2>
+ <div id="pDemo" class="demowrap"></div>
+ <div id="pTime" class="timer">0:00</div><div class="bar" id="pBarWrap"><div id="pBar"></div></div>
+ <div id="rateBox" class="card" hidden><p id="rateQ"></p><div id="rateBtns" class="ratebtns"></div><label class="chk"><input type=checkbox id="pain"> Sharp or joint pain (not just stretch)</label><p id="rateMsg" class="muted"></p></div>
+ <p id="pNext" class="muted next"></p>
+ <div class="controls"><button id="stopBtn" class="ghost">End</button><button id="backBtnP" class="ghost">‹ Back</button><button id="pauseBtn" class="primary">Pause</button><button id="skipBtn" class="ghost">Skip ›</button></div>
+ <p id="pCue" class="cue"></p><div id="pDesc"></div>
 </section>
 <section id="done" hidden><div class="bigicon">✅</div><h2>Done!</h2><p id="doneMsg"></p>
  <a id="logBtn" class="primary btn" href="#">Log to Apple Health</a><button id="homeBtn" class="ghost">Back to start</button></section>
 <section id="history" hidden><header><button id="backBtn" class="ghost">‹ Back</button><h1>History</h1></header>
  <p id="histWeek" class="muted"></p><ol id="histList" class="list"></ol>
- <div class="row"><button id="exportHist" class="ghost">Export JSON</button><button id="clearHist" class="ghost">Clear</button></div></section>
-<script src="stretches.js"></script><script src="generator.js"></script><script src="app.js"></script></body></html>
+ <div class="row"><button id="exportHist" class="ghost">Export JSON</button><button id="importHist" class="ghost">Import JSON</button><button id="clearHist" class="ghost">Clear</button></div><input type=file id="importFile" accept="application/json,.json" hidden>
+ <p class="muted">Export saves everything (history, Develop progress, ratings, loads, tests, settings) as a backup; Import restores it.</p></section>
+<section id="tests" hidden><header><button id="testsBack" class="ghost">‹ Back</button><h1>Progress tests</h1></header>
+ <p id="testDueMsg" class="muted"></p>
+ <details class="card"><summary>How to do each test</summary><ol id="testHow" class="desc"></ol></details>
+ <div id="testForm" class="card testform"></div><button id="saveTest" class="primary">Save results</button>
+ <div class="card"><b>What changed</b><ul id="testNotes" class="desc"></ul><small>Changes under 2 cm / 5° count as noise. Two flat retests in a row → +25% volume, then a method switch. Target met → maintenance and the next weakest area is promoted.</small></div>
+ <div id="charts"></div></section>
+<script src="stretches.js"></script><script src="generator.js"></script><script src="develop.js"></script><script src="app.js"></script></body></html>
