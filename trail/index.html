@@ -18,7 +18,11 @@ button.on{background:#1b5e20;color:#fff;border-color:#1b5e20}
 #pwrap{flex:1;min-height:50px;position:relative;display:flex}#pwrap #profile{flex:1;height:100%}
 #scrubRow{position:absolute;left:34px;right:0;top:0;pointer-events:none;background:rgba(255,255,255,.82);border-radius:4px;padding:0 3px;display:flex;gap:8px;align-items:center;font-size:12.5px;min-height:20px;white-space:nowrap;overflow:hidden}#scrubRow b{font-weight:600}#scrubRow .mut{color:#888}#scrubRow button{pointer-events:auto}
 #pTog{margin-left:auto;padding:2px 8px;font-size:13px}
-body.pcol{--panel-h:122px}body.pcol #pwrap{display:none}
+#pHandle{display:none}
+@media (min-width:900px){:root{--panel-h:var(--ph-desk,340px)}#pHandle{display:block;position:absolute;left:0;right:0;top:-6px;height:12px;cursor:ns-resize;touch-action:none;z-index:2}
+ #pHandle::after{content:'';position:absolute;left:50%;top:3px;width:48px;height:5px;margin-left:-24px;border-radius:3px;background:#aaa}#pHandle:hover::after{background:#1b5e20}
+ #pwrap{flex-direction:column}#scrubRow{order:-1;position:static;background:none;padding:0 0 2px 52px;font-size:14px;height:24px;flex:none}}
+body.pcol{--panel-h:122px}body.pcol #pHandle{display:none}body.pcol #pwrap{display:none}
 .scrubDot{width:16px;height:16px;border-radius:50%;background:#d81b60;border:3px solid #fff;box-shadow:0 0 0 2px #d81b60,0 1px 4px rgba(0,0,0,.5)}
 #msg{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:6px 10px;border-radius:6px;font-size:13px;z-index:1000;display:none;max-width:90%}
 .drawing #map,.wptmode #map{cursor:crosshair}
@@ -28,7 +32,7 @@ body.pcol{--panel-h:122px}body.pcol #pwrap{display:none}
 .wicon{font-size:20px;line-height:26px;width:28px;height:28px;text-align:center;background:#fff;border:2px solid #6a1b9a;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)}
 </style></head><body>
 <div id="map"></div><div id="msg"></div><div id="wpts"></div>
-<div id="panel">
+<div id="panel"><div id="pHandle" title="Drag to resize the profile"></div>
  <div id="stats"><span id="dist">0.00 <small>km</small></span><span id="asc">↑0 <small>m</small></span><span id="desc">↓0 <small>m</small></span><span id="busy"></span><button id="gTog" class="on" title="Colour route on map by gradient" style="padding:2px 8px;font-size:13px">🌈 Grade</button><button id="pTog" title="Show/hide elevation profile">▾ Profile</button><button id="eleWarn" style="display:none;font-size:12px;padding:2px 6px;background:#fff3e0;border-color:#e65100;color:#bf360c"></button></div>
  <div id="bar">
   <button id="mSnap" class="on" title="Tap points; routed on trails">📍 Snap</button>
@@ -158,20 +162,28 @@ function render(){
   SC.pts=pts;SC.cum=prof.map(q=>q[0]);SC.up=cumClimb(pts);SC.prof=prof;SC.D=dist;SC.gr=gradeArr(pts,SC.cum);gradeLines();scrubHit();
   const [up,dn]=climb(pts);$('dist').innerHTML=`${(dist/1000).toFixed(2)} <small>km</small>`;
   $('asc').innerHTML=`↑${Math.round(up)} <small>m</small>`;$('desc').innerHTML=`↓${Math.round(dn)} <small>m</small>`;drawProfile(prof)}
+function niceStep(r){const p=10**Math.floor(Math.log10(r||1)),f=r/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p}
 function drawProfile(prof){SC.prof=prof;SC.geo=null;const c=$('profile'),r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;c.width=r.width*dpr;c.height=r.height*dpr;
   const x=c.getContext('2d');x.scale(dpr,dpr);const W=r.width,H=r.height;x.clearRect(0,0,W,H);
   const v=prof.filter(p=>p[1]!=null);if(v.length<2){x.fillStyle='#999';x.font='12px sans-serif';x.fillText('Elevation profile appears here',8,H/2);return}
   const D=prof.at(-1)[0]||1;let lo=Math.min(...v.map(p=>p[1])),hi=Math.max(...v.map(p=>p[1]));if(hi-lo<20){hi=lo+20}
-  const L0=34,X=d=>L0+d/D*(W-L0-4),Y=e=>H-12-(e-lo)/(hi-lo)*(H-18);
+  const big=H>=120,L0=big?52:34,R0=big?12:4,T=big?20:6,BY=H-(big?22:12);
+  if(big){const st=niceStep((hi-lo)/4);lo=Math.floor(lo/st)*st;hi=Math.ceil(hi/st)*st;if(hi-lo<st)hi=lo+st}
+  const X=d=>L0+d/D*(W-L0-R0),Y=e=>BY-(e-lo)/(hi-lo)*(BY-T);
+  if(big){x.font='12px sans-serif';x.lineWidth=1;const ys=niceStep((hi-lo)/4);x.textAlign='right';
+    for(let e=lo;e<=hi+.01;e+=ys){const y=Math.round(Y(e))+.5;x.strokeStyle='#e3e3e3';x.beginPath();x.moveTo(L0,y);x.lineTo(W-R0,y);x.stroke();x.fillStyle='#444';x.fillText(Math.round(e)+' m',L0-6,y+4)}
+    const xs=niceStep(D/1000/Math.max(2,Math.floor((W-L0)/90)))*1000;x.textAlign='center';
+    for(let d=0;d<=D+.01;d+=xs){const xx=Math.round(X(d))+.5;x.strokeStyle='#e3e3e3';x.beginPath();x.moveTo(xx,T);x.lineTo(xx,BY);x.stroke();x.fillStyle='#444';x.fillText((d/1000).toFixed(xs<1000?1:0)+' km',Math.min(Math.max(xx,L0+14),W-R0-16),H-6)}
+    x.textAlign='start';x.strokeStyle='#999';x.beginPath();x.moveTo(L0+.5,T);x.lineTo(L0+.5,BY+.5);x.lineTo(W-R0,BY+.5);x.stroke()}
   const runs=[];let run=[];prof.forEach(p=>{if(p[1]==null){if(run.length)runs.push(run);run=[]}else run.push(p)});if(run.length)runs.push(run);
-  if(runs.length>1){x.fillStyle='rgba(0,0,0,.06)';for(let i=1;i<runs.length;i++)x.fillRect(X(runs[i-1].at(-1)[0]),6,X(runs[i][0][0])-X(runs[i-1].at(-1)[0]),H-18)} // gaps = no elevation
+  if(runs.length>1){x.fillStyle='rgba(0,0,0,.06)';for(let i=1;i<runs.length;i++)x.fillRect(X(runs[i-1].at(-1)[0]),T,X(runs[i][0][0])-X(runs[i-1].at(-1)[0]),BY-T)} // gaps = no elevation
   const G=SC.prof===prof&&SC.gr&&SC.gr.length===prof.length?SC.gr:null;
-  if(G){for(let i=1;i<prof.length;i++){const a=prof[i-1],b=prof[i];if(a[1]==null||b[1]==null)continue;x.beginPath();x.moveTo(X(a[0]),H-12);x.lineTo(X(a[0]),Y(a[1]));x.lineTo(X(b[0]),Y(b[1]));x.lineTo(X(b[0])+.6,H-12);x.closePath();x.fillStyle=gCol(G[i],.75);x.fill()}}
-  runs.forEach(v=>{if(!G){x.beginPath();x.moveTo(X(v[0][0]),H-12);v.forEach(p=>x.lineTo(X(p[0]),Y(p[1])));x.lineTo(X(v.at(-1)[0]),H-12);x.closePath();x.fillStyle='rgba(46,125,50,.35)';x.fill()}
+  if(G){for(let i=1;i<prof.length;i++){const a=prof[i-1],b=prof[i];if(a[1]==null||b[1]==null)continue;x.beginPath();x.moveTo(X(a[0]),BY);x.lineTo(X(a[0]),Y(a[1]));x.lineTo(X(b[0]),Y(b[1]));x.lineTo(X(b[0])+.6,BY);x.closePath();x.fillStyle=gCol(G[i],.75);x.fill()}}
+  runs.forEach(v=>{if(!G){x.beginPath();x.moveTo(X(v[0][0]),BY);v.forEach(p=>x.lineTo(X(p[0]),Y(p[1])));x.lineTo(X(v.at(-1)[0]),BY);x.closePath();x.fillStyle='rgba(46,125,50,.35)';x.fill()}
     x.beginPath();v.forEach((p,i)=>i?x.lineTo(X(p[0]),Y(p[1])):x.moveTo(X(p[0]),Y(p[1])));x.strokeStyle='#1b5e20';x.lineWidth=1.5;x.stroke()});
-  x.fillStyle='#333';x.font='10px sans-serif';x.fillText(Math.round(hi)+'m',0,10);x.fillText(Math.round(lo)+'m',0,H-12);x.fillText((D/1000).toFixed(1)+' km',W-40,H-1);
-  if(G){x.font='9px sans-serif';let lx=W-48;[...GB].reverse().forEach(b=>{const t=b[2],w=x.measureText(t).width+12;lx-=w;x.fillStyle=b[1];x.fillRect(lx,H-9,8,8);x.fillStyle='#333';x.fillText(t,lx+10,H-1)})}
-  SC.geo={L0,W,H,D,X,Y};scrubDecor(x)}
+  if(!big){x.fillStyle='#333';x.font='10px sans-serif';x.fillText(Math.round(hi)+'m',0,10);x.fillText(Math.round(lo)+'m',0,BY);x.fillText((D/1000).toFixed(1)+' km',W-40,H-1)}
+  if(G){x.font=big?'11px sans-serif':'9px sans-serif';const ly=big?14:H-1;let lx=W-(big?R0:48);[...GB].reverse().forEach(b=>{const t=b[2],w=x.measureText(t).width+12;lx-=w;x.fillStyle=b[1];x.fillRect(lx,ly-8,8,8);x.fillStyle='#333';x.fillText(t,lx+10,ly)})}
+  SC.geo={L0,R0,BY,T,W,H,D,X,Y};scrubDecor(x)}
 addEventListener('resize',render);
 
 // ---- scrub along the trail: SC.pos = metres from start (null = off)
@@ -206,12 +218,12 @@ function scrubUpdate(){const s=scrubState(SC.pos),row=$('scrubRow');
   $('scX').onclick=()=>setScrub(null);drawProfile(SC.prof)}
 function wptDist(w){const P=SC.pts;if(P.length<2)return null;let bi=0,bd=Infinity;for(let i=0;i<P.length;i++){const d=hav(P[i],[w.lat,w.lng]);if(d<bd){bd=d;bi=i}}return bd<=200?SC.cum[bi]:null}
 function scrubDecor(x){const g=SC.geo;if(!g)return;
-  wpts.forEach(w=>{const d=wptDist(w);if(d==null)return;const X=g.X(d);x.strokeStyle='#6a1b9a';x.lineWidth=1.5;x.beginPath();x.moveTo(X,g.H-12);x.lineTo(X,g.H-20);x.stroke();
-    x.font='11px sans-serif';x.textAlign='center';x.fillText((WTYPES[w.type]||WTYPES.other).icon,X,g.H-22);x.textAlign='start'});
-  const s=scrubState(SC.pos);if(!s)return;const X=g.X(s.d);x.strokeStyle='#d81b60';x.lineWidth=1.5;x.beginPath();x.moveTo(X,4);x.lineTo(X,g.H-12);x.stroke();
+  wpts.forEach(w=>{const d=wptDist(w);if(d==null)return;const X=g.X(d);x.strokeStyle='#6a1b9a';x.lineWidth=1.5;x.beginPath();x.moveTo(X,g.BY);x.lineTo(X,g.BY-8);x.stroke();
+    x.font='11px sans-serif';x.textAlign='center';x.fillText((WTYPES[w.type]||WTYPES.other).icon,X,g.BY-10);x.textAlign='start'});
+  const s=scrubState(SC.pos);if(!s)return;const X=g.X(s.d);x.strokeStyle='#d81b60';x.lineWidth=1.5;x.beginPath();x.moveTo(X,g.T);x.lineTo(X,g.BY);x.stroke();
   if(s.ele!=null){x.fillStyle='#d81b60';x.beginPath();x.arc(X,g.Y(s.ele),4,0,7);x.fill()}}
 (()=>{const c=$('profile');let id=null;
-  const at=e=>{const g=SC.geo;if(!g||SC.pts.length<2)return;const r=c.getBoundingClientRect();setScrub((e.clientX-r.left-g.L0)/(g.W-g.L0-4)*g.D)};
+  const at=e=>{const g=SC.geo;if(!g||SC.pts.length<2)return;const r=c.getBoundingClientRect();setScrub((e.clientX-r.left-g.L0)/(g.W-g.L0-g.R0)*g.D)};
   c.addEventListener('pointerdown',e=>{if(SC.pts.length<2)return;e.preventDefault();id=e.pointerId;try{c.setPointerCapture(id)}catch(_){}at(e)});
   c.addEventListener('pointermove',e=>{if(id===e.pointerId){e.preventDefault();at(e)}});
   const up=e=>{if(id===e.pointerId)id=null};c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
@@ -227,6 +239,14 @@ function scrubHit(){if(SC.hit){map.removeLayer(SC.hit);SC.hit=null}if(SC.pts.len
   SC.hit.on('mousemove click',e=>{if(mode!=='free')setScrub(nearestDist(e.latlng))});scrubUpdate()}
 function setPanel(col){document.body.classList.toggle('pcol',col);$('pTog').textContent=col?'▸ Profile':'▾ Profile';try{localStorage.setItem('tp-ui',col?'col':'')}catch(e){}
   map.invalidateSize();render()}
+// desktop: drag handle to resize the panel; height remembered in localStorage tp-ph
+(()=>{const h=$('pHandle'),root=document.documentElement;let sy=null,sh=0;
+  const setH=px=>{px=Math.round(Math.max(230,Math.min(innerHeight*.75,px)));root.style.setProperty('--ph-desk',px+'px');return px};
+  try{const v=+localStorage.getItem('tp-ph');if(v)setH(v)}catch(e){}
+  h.addEventListener('pointerdown',e=>{e.preventDefault();sy=e.clientY;sh=$('panel').offsetHeight;h.setPointerCapture(e.pointerId)});
+  h.addEventListener('pointermove',e=>{if(sy==null)return;setH(sh+sy-e.clientY);map.invalidateSize();drawProfile(SC.prof)});
+  const end=()=>{if(sy==null)return;sy=null;const px=setH($('panel').offsetHeight);try{localStorage.setItem('tp-ph',px)}catch(e){}map.invalidateSize();render()};
+  h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end)})();
 $('gTog').onclick=()=>setGrade(!gOn);if(!gOn)$('gTog').classList.remove('on');
 $('pTog').onclick=()=>setPanel(!document.body.classList.contains('pcol'));
 try{if(localStorage.getItem('tp-ui')==='col')document.body.classList.add('pcol'),$('pTog').textContent='▸ Profile'}catch(e){}
