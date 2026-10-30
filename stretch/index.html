@@ -1,65 +1,64 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Stretch by Bot">
-<meta name="theme-color" content="#0f1720"><link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Stretch by Bot">
+<meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><meta name="color-scheme" content="light dark"><meta name="format-detection" content="telephone=no"><link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" href="icon.svg">
 <title>Stretch by Bot</title><link rel="stylesheet" href="style.css"></head><body>
 <section id="home">
- <header><h1>Stretch by Bot</h1><span><button id="testsBtn" class="ghost">Tests</button> <button id="histBtn" class="ghost">History</button></span></header>
- <div class="card timebar"><div class="tb-top"><small>Time available</small><b id="capLbl">Full session</b></div>
+ <nav class="navbar"><span></span><span class="navbtns"><button id="testsBtn" class="link">Tests</button><button id="histBtn" class="link">History</button></span></nav>
+ <h1 class="large">Stretch by Bot</h1>
+ <small class="sh">Time available</small><div class="card timebar"><div class="tb-top"><span>Session length</span><b id="capLbl">Full session</b></div>
   <input type="range" id="cap" min="5" max="45" step="5" value="45" aria-label="Time available in minutes">
-  <div class="tb-ticks"><span>5</span><span>15</span><span>25</span><span>35</span><span>Full</span></div></div>
- <button id="testDue" class="ghost due" hidden>📏 Progress test due — tap to record</button>
- <div><small>Today</small><div id="todayChips" class="chips" role="group" aria-label="Today"></div></div>
- <label class="chk toggle"><input type=checkbox class="noEquip" id="noEquipTop"> No equipment (wall &amp; floor only)</label>
- <div><small>Session</small><div id="typeChips" class="chips" role="group" aria-label="Session type"></div></div>
+  <div class="tb-ticks"><span>5 min</span><span>15</span><span>25</span><span>35</span><span>Full</span></div></div>
+ <button id="testDue" class="ghost due" hidden>📏 Progress test due · Tap to record</button>
+ <div><small class="sh">Today</small><div id="todayChips" class="chips" role="group" aria-label="Today"></div></div>
+ <div><small class="sh">Session type</small><div id="typeChips" class="chips" role="group" aria-label="Session type"></div></div>
  <p id="guide" class="muted"></p>
+ <small class="sh">Equipment</small><div id="equipPanel" class="card"><div id="equipList"></div><small id="equipSwaps"></small>
+  <label class="switch"><span>Bodyweight only (wall &amp; floor)</span><input type=checkbox class="noEquip" id="noEquipTop" role="switch"><i></i></label>
+  <details><summary>Equipment I own</summary><div id="ownList"></div><small>Moves needing anything unticked are swapped for bodyweight versions automatically.</small></details></div>
  <div class="card row"><div><big id="planTotal">15:00</big><small><span id="planCount"></span> stretches</small></div>
-  <button id="regen" class="ghost" aria-label="Regenerate">↻ New routine</button></div>
- <div class="opts" id="lenBox" hidden><label>Length <select id="minutes"><option>10</option><option>15</option><option>20</option><option>25</option></select> min</label>
-</div>
- <div id="focusBox"><small>Focus (trail running first; others secondary)</small><div id="focusChips" class="chips" role="group" aria-label="Focus"></div></div>
- <details id="devBox" class="card"><summary>Develop: priority areas, weekly progress, loads</summary>
+  <button id="regen" class="tinted" aria-label="New routine">↻ New routine</button></div>
+ <div id="focusBox"><small class="sh">Focus · trail running first</small><div id="focusChips" class="chips" role="group" aria-label="Focus"></div></div>
+ <details id="devBox" class="card"><summary>Develop · areas, progress &amp; loads</summary>
   <p id="devNote" class="muted"></p><div id="weekBars"></div>
   <small>Priority areas (pick 3–4)</small><div id="areaPick"></div><p id="areaMsg" class="muted"></p>
   <div id="loads"></div></details>
- <label class="toggle">Rest between stretches <select id="rest"><option>15</option><option>30</option><option>45</option><option>60</option></select> s</label>
- <div id="equipPanel" class="card"><div id="equipList"></div><small id="equipSwaps"></small>
-  <label class="chk"><input type=checkbox class="noEquip" id="noEquipPanel"> Switch to the no-equipment version</label>
-  <details><summary>Equipment I own</summary><div id="ownList"></div><small>Moves needing anything unticked are swapped automatically for bodyweight versions.</small></details></div>
- <p class="muted">Your routine (<span id="planFocus"></span>). Tap a stretch for the full how-to and demo.</p>
+ <label class="card rowcell">Rest between stretches <select id="rest"><option value="15">15 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></label>
+ <small class="sh">Your routine · <span id="planFocus"></span></small>
  <ol id="planList" class="list"></ol>
- <details class="card"><summary>Apple Health logging</summary>
+ <p class="foot">Tap a stretch for the full how-to and demo.</p>
+ <details class="card"><summary>Apple Health</summary>
   <label>Shortcut name <input id="scName"></label>
-  <label class="chk"><input type="checkbox" id="autoLog"> Open Shortcut automatically at the end (only once it is installed)</label>
-  <button id="testSc" class="ghost">Test Shortcut (logs 1 min)</button>
-  <p class="muted">Setup steps are in the README. Gentle stretching only — stop if anything hurts.</p></details>
- <button id="startBtn" class="primary">Start</button>
+  <label class="switch"><span>Log automatically at the end<small>Only once the Shortcut is installed</small></span><input type="checkbox" id="autoLog" role="switch"><i></i></label>
+  <button id="testSc" class="tinted">Test Shortcut (logs 1 min)</button>
+  <p class="muted">Gentle stretching only. Stop if anything hurts.</p></details>
+ <div class="dock"><button id="startBtn" class="primary">Start session</button></div>
 </section>
 <section id="player" hidden>
  <div class="top"><span id="pStep"></span><span id="pTotal"></span></div>
  <div id="pPhase"></div><h2 id="pName"></h2>
  <div id="pDemo" class="demowrap"></div>
- <div id="pTime" class="timer">0:00</div><div class="bar" id="pBarWrap"><div id="pBar"></div></div>
+ <div class="ringwrap" id="pBarWrap"><svg class="ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="54"/><circle id="pBar" class="prog" cx="60" cy="60" r="54" pathLength="100"/></svg><div id="pTime" class="timer">0:00</div></div>
  <div id="rateBox" class="card" hidden><p id="rateQ"></p><div id="rateBtns" class="ratebtns"></div><label class="chk"><input type=checkbox id="pain"> Sharp or joint pain (not just stretch)</label><p id="rateMsg" class="muted"></p></div>
  <p id="pNext" class="muted next"></p>
- <div class="controls"><button id="stopBtn" class="ghost">End</button><button id="backBtnP" class="ghost">‹ Back</button><button id="pauseBtn" class="primary">Pause</button><button id="skipBtn" class="ghost">Skip ›</button></div>
+ <div class="controls"><button id="stopBtn" class="ghost danger">End</button><button id="backBtnP" class="ghost">‹ Back</button><button id="pauseBtn" class="primary">Pause</button><button id="skipBtn" class="ghost">Skip ›</button></div>
  <p id="pCue" class="cue"></p><div id="pDesc"></div>
 </section>
-<section id="done" hidden><div class="bigicon">✅</div><h2>Done!</h2><p id="doneMsg"></p>
+<section id="done" hidden><div class="check" aria-hidden="true">✓</div><h1 class="large">Session complete</h1><p id="doneMsg"></p>
  <a id="logBtn" class="primary btn" href="#">❤️ Log to Apple Health</a>
  <div id="healthSetup" class="card setup" hidden><b>Log to Apple Health (one-time setup)</b>
   <p class="desc">Web apps can't write to Health directly, so a small Shortcut called <b>Log Stretch</b> does it. Install it once, then logging is one tap.</p>
   <a id="installSc" class="primary btn" href="#" target="_blank" rel="noopener">Get the Log Stretch Shortcut</a>
-  <button id="scReady" class="ghost">I've installed it, log this session</button>
-  <button id="scSkip" class="ghost">Not now</button></div>
- <small id="logState" class="muted"></small><button id="homeBtn" class="ghost">Back to start</button></section>
-<section id="history" hidden><header><button id="backBtn" class="ghost">‹ Back</button><h1>History</h1></header>
+  <button id="scReady" class="tinted">I've installed it · Log this session</button>
+  <button id="scSkip" class="link">Not now</button></div>
+ <small id="logState" class="muted"></small><button id="homeBtn" class="tinted">Done</button></section>
+<section id="history" hidden><nav class="navbar"><button id="backBtn" class="link">‹ Back</button></nav><h1 class="large">History</h1>
  <p id="histWeek" class="muted"></p><ol id="histList" class="list"></ol>
- <div class="row"><button id="exportHist" class="ghost">Export JSON</button><button id="importHist" class="ghost">Import JSON</button><button id="clearHist" class="ghost">Clear</button></div><input type=file id="importFile" accept="application/json,.json" hidden>
+ <div class="row3"><button id="exportHist" class="tinted">Export</button><button id="importHist" class="tinted">Import</button><button id="clearHist" class="tinted danger">Clear</button></div><input type=file id="importFile" accept="application/json,.json" hidden>
  <p class="muted">Export saves everything (history, Develop progress, ratings, loads, tests, settings) as a backup; Import restores it.</p></section>
-<section id="tests" hidden><header><button id="testsBack" class="ghost">‹ Back</button><h1>Progress tests</h1></header>
+<section id="tests" hidden><nav class="navbar"><button id="testsBack" class="link">‹ Back</button></nav><h1 class="large">Progress tests</h1>
  <p id="testDueMsg" class="muted"></p>
  <details class="card"><summary>How to do each test</summary><ol id="testHow" class="desc"></ol></details>
  <div id="testForm" class="card testform"></div><button id="saveTest" class="primary">Save results</button>

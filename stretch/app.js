@@ -12,7 +12,7 @@ const TODAY={prerun:['Pre-run','prerun','Dynamic warm-up only (5–8 min). No lo
 let routine=null, run=null, wakeLock=null, actx=null;
 
 function fmt(s){s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
-function show(id){document.querySelectorAll('section').forEach(x=>x.hidden=x.id!==id)}
+function show(id){document.querySelectorAll('section').forEach(x=>x.hidden=x.id!==id);window.scrollTo(0,0)}
 
 // ---------- Audio ----------
 function beep(freq=880,dur=0.15){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=freq;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(0.3,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);o.start();o.stop(actx.currentTime+dur)}catch(e){} window.__beeps=(window.__beeps||0)+1}
@@ -61,7 +61,7 @@ function renderEquip(){
   $('#ownList').innerHTML=Gen.OWNABLE.map(k=>`<label class="chk"><input type=checkbox data-own="${k}" ${(settings.owned||Gen.OWNABLE).includes(k)?'checked':''}> ${Gen.EQUIP[k]}</label>`).join('');
 }
 function renderDev(){
-  const isDev=['develop','topup'].includes(settings.type);$('#devBox').hidden=!isDev;$('#focusBox').hidden=settings.type!=='random';$('#lenBox').hidden=true;
+  const isDev=['develop','topup'].includes(settings.type);$('#devBox').hidden=!isDev;$('#focusBox').hidden=settings.type!=='random';
   document.querySelectorAll('#todayChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===settings.today));
   document.querySelectorAll('#typeChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===settings.type));
   $('#guide').textContent=TODAY[settings.today][2]+' Do Develop after runs or 6+ hours apart from one.';
@@ -102,7 +102,7 @@ function enterStep(i){
   if($('#pDemo').dataset.id!==ex.id){$('#pDemo').innerHTML=demoSVG(ex);$('#pDemo').dataset.id=ex.id;$('#pDesc').innerHTML=fullDesc(ex);$('#pCue').textContent=ex.cue}
   $('#pStep').textContent=`Step ${i+1}/${routine.steps.length}`;
   const nxt=routine.steps.slice(i+1).find(s=>s.type==='hold'&&(s.ex!==st.ex||s.side!==st.side));
-  $('#pNext').textContent=nxt?`Next up: ${nxt.ex.name}${nxt.side?' ('+nxt.side+')':''}`:'Last one!';
+  $('#pNext').textContent=nxt?`Next up: ${nxt.ex.name}${nxt.side?' ('+nxt.side+')':''}`:'Last one';
   $('#backBtnP').disabled=i===0;
   beep(st.type==='hold'?880:st.type==='contract'?740:520,st.type==='hold'?0.3:0.15);
   if(st.kg>0&&st.type!=='rate')$('#pName').textContent=ex.icon+' '+ex.name+' · '+st.kg+' kg';
@@ -114,7 +114,7 @@ function tick(){
     const rem=(run.stepEnd-performance.now())*SPEED/1000;
     $('#pTime').textContent=fmt(rem);
     const st=routine.steps[run.i];
-    $('#pBar').style.width=(100*(1-rem/st.secs))+'%';
+    $('#pBar').style.strokeDashoffset=(100*Math.max(0,rem/st.secs)).toFixed(2);
     const elapsedTotal=routine.steps.slice(0,run.i).reduce((a,s)=>a+s.secs,0)+(st.secs-rem);
     $('#pTotal').textContent=fmt(Gen.totalSec(routine.steps)-elapsedTotal)+' left';
     const c=Math.ceil(rem); if(c<=3&&c>0&&c!==lastCount&&st.type==='hold'&&st.secs>5){beep(440,0.08)} lastCount=c;
@@ -138,7 +138,7 @@ function finish(early){
   const hist=LS.get('history',[]);hist.unshift({date:new Date().toISOString(),secs,minutes,stretches:routine.items.map(s=>s.name),focus:routine.focus,type:routine.type,focusName:routine.label,complete:!early});LS.set('history',hist.slice(0,200));
   run=null;
   const url=shortcutURL(minutes);
-  $('#doneMsg').textContent=`${minutes} min · ${routine.label}. Nice work.`;
+  $('#doneMsg').textContent=`${minutes} min · ${routine.label}`;
   $('#logBtn').href=url; $('#logBtn').onclick=()=>{const h=LS.get('history',[]);if(h[0]){h[0].logged=true;LS.set('history',h)}setTimeout(()=>{$('#logState').textContent='Sent to Apple Health ✓';renderHistory()},400)};
   $('#logState').textContent='Saved to History.';
   const ready=!!settings.healthReady;$('#logBtn').hidden=!ready;$('#healthSetup').hidden=ready;
@@ -157,11 +157,10 @@ function renderHistory(){
 }
 // ---------- Wiring ----------
 function bindSettings(){
-  $('#minutes').value=settings.minutes;$('#rest').value=settings.rest||30;$('#rest').onchange=()=>{settings.rest=Number($('#rest').value);save();newRoutine()};$('#scName').value=settings.shortcut;$('#autoLog').checked=settings.autoLog;
-  const save=()=>{settings={...settings,minutes:Number($('#minutes').value),shortcut:$('#scName').value.trim()||'Log Stretch',autoLog:$('#autoLog').checked};LS.set('settings',settings)};
-  $('#minutes').addEventListener('change',()=>{save();newRoutine()});
+  $('#rest').value=settings.rest||30;$('#rest').onchange=()=>{settings.rest=Number($('#rest').value);save();newRoutine()};$('#scName').value=settings.shortcut;$('#autoLog').checked=settings.autoLog;
+  const save=()=>{settings={...settings,shortcut:$('#scName').value.trim()||'Log Stretch',autoLog:$('#autoLog').checked};LS.set('settings',settings)};
   $('#scReady').onclick=()=>{healthReady();$('#logBtn').click()};$('#scSkip').onclick=()=>show('home');
-  const capLbl=()=>{const v=Number($('#cap').value);$('#capLbl').textContent=v>=45?'Full session':v+' min max'};
+  const capLbl=()=>{const el=$('#cap'),v=Number(el.value);$('#capLbl').textContent=v>=45?'Full session':'Up to '+v+' min';el.style.setProperty('--p',((v-5)/40*100)+'%')};
   $('#cap').value=settings.cap||45;capLbl();
   $('#cap').addEventListener('input',capLbl);
   $('#cap').addEventListener('change',()=>{const v=Number($('#cap').value);settings.cap=v>=45?0:v;LS.set('settings',settings);newRoutine()});
@@ -212,3 +211,7 @@ $('#testsBtn').onclick=()=>{renderTests();show('tests')};$('#testDue').onclick=(
 $('#testSc').onclick=()=>fire(shortcutURL(1));
 bindSettings();newRoutine();show('home');
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js');
+
+// ---------- Haptic-like feedback ----------
+document.addEventListener('pointerdown',e=>{const b=e.target.closest('button,.btn,summary,.switch');if(!b)return;b.classList.add('tap');try{navigator.vibrate&&navigator.vibrate(8)}catch{}},{passive:true});
+['pointerup','pointercancel','pointerleave'].forEach(t=>document.addEventListener(t,()=>document.querySelectorAll('.tap').forEach(x=>x.classList.remove('tap')),{passive:true}));
