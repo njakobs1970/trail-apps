@@ -254,7 +254,7 @@ function classifyHint(h) {
   const cross = w => Math.abs(w.a) >= 45 && (w.p >= 16 || (w.p >= 8 && w.p > inP));
   return sig.some(x => cross(x) && x.a < 0) && sig.some(x => cross(x) && x.a > 0) ? "C" : null;
 }
-const CUE_VER = 3;     // bump to recompute cues stored by older versions
+const CUE_VER = 4;     // bump to recompute cues stored by older versions
 function parseHints(vh, n) {
   if (!Array.isArray(vh)) return [];
   return vh.map(h => ({ i: +h[0], t: hintJunction(h) })).filter(c => c.t && c.i > 0 && c.i < n - 1);
@@ -290,7 +290,7 @@ function osmTile(k) {
         const j = await getJSON(`${OSM_API}?bbox=${[x * TILE, y * TILE, (x + 1) * TILE, (y + 1) * TILE].map(v => v.toFixed(4)).join(",")}`, { headers: { Accept: "application/json" } }, 2);
         if (!j || !Array.isArray(j.elements)) return null;
         const N = new Map(); j.elements.forEach(e => { if (e.type === "node") N.set(e.id, e) });
-        return { elements: j.elements.filter(e => e.type === "way" && e.tags && e.tags.highway).map(e => { const ns = e.nodes.filter(id => N.has(id)); return { tags: e.tags, nodes: ns, geometry: ns.map(id => ({ lat: N.get(id).lat, lon: N.get(id).lon })) } }) };
+        return { elements: j.elements.filter(e => e.type === "way" && e.tags && e.tags.highway).map(e => { const ns = e.nodes.filter(id => N.has(id)); return { id: e.id, tags: e.tags, nodes: ns, geometry: ns.map(id => ({ lat: N.get(id).lat, lon: N.get(id).lon })) } }) };
       }];
     for (const get of srcs) {
       const j = await get();
@@ -302,7 +302,7 @@ function osmTile(k) {
           const key = n.lat.toFixed(5) + "," + n.lon.toFixed(5); let L = osmNodes.get(key); if (!L) osmNodes.set(key, L = []);
           const id = w.nodes ? w.nodes[i] : key;           // OSM node id: only ways that really share the node count
           let nd = L.find(z => z.id === id); if (!nd) L.push(nd = { id, lat: n.lat, lng: n.lon, adj: [] });
-          for (const m of [g[i - 1], g[i + 1]]) if (m && !nd.adj.some(a => Math.abs(a[0] - m.lat) < 2e-6 && Math.abs(a[1] - m.lon) < 2e-6)) nd.adj.push([m.lat, m.lon, kd]);
+          for (const m of [g[i - 1], g[i + 1]]) if (m && !nd.adj.some(a => Math.abs(a[0] - m.lat) < 2e-6 && Math.abs(a[1] - m.lon) < 2e-6)) nd.adj.push([m.lat, m.lon, kd, w.id]);
         });
       }
       return true;
@@ -319,26 +319,48 @@ function osmNodeAt(p) {
   }
   return best;
 }
-const angDiff = (a, b) => ((a - b + 540) % 360) - 180;
-/** Junction cue at P[i] (in/out = neighbour route points), or null. */
+/** Point at route distance d (m), interpolated along the route geometry. */
+function ptAtDist(P, cum, d) {
+  if (d <= 0) return P[0]; if (d >= cum[cum.length - 1]) return P[P.length - 1];
+  let lo = 0, hi = cum.length - 1; while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] <= d) lo = m; else hi = m }
+  const f = cum[hi] > cum[lo] ? (d - cum[lo]) / (cum[hi] - cum[lo]) : 0;
+  return [P[lo][0] + (P[hi][0] - P[lo][0]) * f, P[lo][1] + (P[hi][1] - P[lo][1]) * f];
+}
+/** Signed angle normalised to (-180, 180], + = right. */
+const angDiff = (a, b) => { let d = ((a - b) % 360 + 360) % 360; return d > 180 ? d - 360 : d };
+/** Incoming / outgoing route bearings at P[i], measured along the route ~15-30 m before/after the node
+ *  (falls back to the nearest distinct point when the route is shorter there). */
+function routeArms(P, cum, i, arm = 20) {
+  const ds = cum[i], D = cum[cum.length - 1], J = [P[i][0], P[i][1]];
+  const back = ptAtDist(P, cum, Math.max(0, ds - arm)), fwd = ptAtDist(P, cum, Math.min(D, ds + arm));
+  if (hav(back, J) < 3 || hav(fwd, J) < 3) return null;
+  // first distinct neighbours (>= 1 m away) give the route's own edges at the node
+  let a = i - 1; while (a > 0 && hav(P[a], J) < 1) a--; let b = i + 1; while (b < P.length - 1 && hav(P[b], J) < 1) b++;
+  return { bIn: bearing(back, J), bOut: bearing(J, fwd), eBack: bearing(J, P[a]), eOut: bearing(J, P[b]) };
+}
+/** Junction cue at P[i], or null. */
 function junctionAt(P, cum, i) {
-  const n = osmNodeAt(P[i]); if (!n || n.adj.length < 2) return null;
-  const prev = P[i - 1], next = P[i + 1], bIn = bearing(prev, P[i]), bBack = bearing(P[i], prev), bOut = bearing(P[i], next);
-  const br = [];
+  const n = osmNodeAt(P[i]); if (!n || n.adj.length < 3) return null;     // a node on just one way through: never a junction
+  const R = routeArms(P, cum, i); if (!R) return null;
+  const br = []; let wIn = null, wOut = null;
   for (const a of n.adj) {
-    if (hav(a, prev) < 2 || hav(a, next) < 2) continue;                      // the route's own edges
     const b = bearing(P[i], a);
-    if (Math.abs(angDiff(b, bBack)) < 8 || Math.abs(angDiff(b, bOut)) < 8) continue;   // duplicate / overlapping geometry
+    if (Math.abs(angDiff(b, R.eBack)) < 15) { wIn = a[3]; continue }    // the route's own edges
+    if (Math.abs(angDiff(b, R.eOut)) < 15) { wOut = a[3]; continue }
     if (br.some(x => Math.abs(angDiff(x.b, b)) < 8)) continue;
-    br.push({ b, rel: angDiff(b, bIn), kind: a[2] });
+    br.push({ b, rel: angDiff(b, R.bIn), kind: a[2] });
   }
   if (!br.length) return null;
-  const t = angCode(turnAt(P, cum, i, 15));
+  const turn = angDiff(R.bOut, R.bIn);
+  let t = angCode(turn);
+  // Route stays on the same OSM way through the node: that way is the obvious continuation, so a bend
+  // in it is not a turn. Only call a turn when a side branch is nearer to straight ahead than the route.
+  if (t !== "C" && wIn != null && wIn === wOut && !br.some(z => Math.abs(z.rel) < Math.abs(turn))) t = "C";
   let x = "";
   if (t === "C" || t === "TSLL" || t === "TSLR") {        // following the main way past a side way: say what branches off
     const kind = br.some(z => z.kind === "road") ? "road" : br.some(z => z.kind === "track") ? "track" : "path";
-    const L = br.some(z => z.rel < -20 && z.rel > -160), R = br.some(z => z.rel > 20 && z.rel < 160);
-    x = L && R ? `${kind} crossing` : L ? `${kind} left` : R ? `${kind} right` : "";
+    const L = br.some(z => z.rel < -20 && z.rel > -160), Rt = br.some(z => z.rel > 20 && z.rel < 160);
+    x = L && Rt ? `${kind} crossing` : L ? `${kind} left` : Rt ? `${kind} right` : "";
   }
   return { t, x };
 }
@@ -999,4 +1021,4 @@ load(); updLegend(); render(); renderW(); updHint();
 if (segs.some(s => s.mode === "snap" && !s.fallback && s.cv !== CUE_VER)) rebuildCues(); else updJoins();
 if (eleWarn || allPts().some(p => p[2] == null)) backfillAll();
 
-window.TP = { classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
+window.TP = { junctionAt, routeArms, angDiff, osmNodes, classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
