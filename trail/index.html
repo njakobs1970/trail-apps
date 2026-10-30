@@ -1,338 +1,165 @@
 <!doctype html>
-<html lang="en"><head>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="theme-color" content="#1b5e20">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <title>Trail Planner</title>
-<link rel="icon" href="data:,">
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
-*{box-sizing:border-box}html,body{margin:0;height:100%;font-family:system-ui,-apple-system,sans-serif}
-#map{position:absolute;inset:0 0 var(--panel-h,170px) 0}
-#panel{position:absolute;left:0;right:0;bottom:0;z-index:950;height:var(--panel-h,170px);background:#fff;border-top:1px solid #ccc;padding:6px 8px;display:flex;flex-direction:column;gap:4px}
-#stats{display:flex;gap:12px;font-size:15px;font-weight:600}#stats span small{font-weight:400;color:#666}
-#bar{display:flex;gap:6px;flex-wrap:wrap}
-button{font-size:15px;padding:8px 10px;border-radius:8px;border:1px solid #888;background:#f4f4f4;touch-action:manipulation}
-button.on{background:#1b5e20;color:#fff;border-color:#1b5e20}
-#profile{flex:1;min-height:50px;width:100%;touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:ew-resize}
-#pwrap{flex:1;min-height:50px;position:relative;display:flex}#pwrap #profile{flex:1;height:100%}
-#scrubRow{position:absolute;left:34px;right:0;top:0;pointer-events:none;background:rgba(255,255,255,.82);border-radius:4px;padding:0 3px;display:flex;gap:8px;align-items:center;font-size:12.5px;min-height:20px;white-space:nowrap;overflow:hidden}#scrubRow b{font-weight:600}#scrubRow .mut{color:#888}#scrubRow button{pointer-events:auto}
-#pTog{margin-left:auto;padding:2px 8px;font-size:13px}
-#pHandle{display:none}
-@media (min-width:900px){:root{--panel-h:var(--ph-desk,340px)}#pHandle{display:block;position:absolute;left:0;right:0;top:-6px;height:12px;cursor:ns-resize;touch-action:none;z-index:2}
- #pHandle::after{content:'';position:absolute;left:50%;top:3px;width:48px;height:5px;margin-left:-24px;border-radius:3px;background:#aaa}#pHandle:hover::after{background:#1b5e20}
- #pwrap{flex-direction:column}#scrubRow{order:-1;position:static;background:none;padding:0 0 2px 52px;font-size:14px;height:24px;flex:none}}
-body.pcol{--panel-h:122px}body.pcol #pHandle{display:none}body.pcol #pwrap{display:none}
-.scrubDot{width:16px;height:16px;border-radius:50%;background:#d81b60;border:3px solid #fff;box-shadow:0 0 0 2px #d81b60,0 1px 4px rgba(0,0,0,.5)}
-#msg{position:absolute;top:8px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,.75);color:#fff;padding:6px 10px;border-radius:6px;font-size:13px;z-index:1000;display:none;max-width:90%}
-.drawing #map,.wptmode #map{cursor:crosshair}
-#wpts{position:absolute;right:6px;bottom:calc(var(--panel-h,170px) + 6px);z-index:900;background:#fff;border-radius:8px;box-shadow:0 1px 6px rgba(0,0,0,.35);max-height:38%;overflow:auto;width:min(330px,calc(100% - 60px));display:none;font-size:14px}
-#wpts.open{display:block}#wpts h4{margin:0;padding:6px 8px;background:#1b5e20;color:#fff;font-size:13px;position:sticky;top:0}
-.wrow{display:flex;gap:4px;align-items:center;padding:4px 6px;border-top:1px solid #eee}.wrow input{flex:1;min-width:0;font-size:15px;padding:4px}.wrow select{font-size:16px;padding:2px}.wrow button{padding:4px 7px}
-.wicon{font-size:20px;line-height:26px;width:28px;height:28px;text-align:center;background:#fff;border:2px solid #6a1b9a;border-radius:50%;box-shadow:0 1px 3px rgba(0,0,0,.4)}
-</style></head><body>
-<div id="map"></div><div id="msg"></div><div id="wpts"></div>
-<div id="panel"><div id="pHandle" title="Drag to resize the profile"></div>
- <div id="stats"><span id="dist">0.00 <small>km</small></span><span id="asc">↑0 <small>m</small></span><span id="desc">↓0 <small>m</small></span><span id="busy"></span><button id="gTog" class="on" title="Colour route on map by gradient" style="padding:2px 8px;font-size:13px">🌈 Grade</button><button id="pTog" title="Show/hide elevation profile">▾ Profile</button><button id="eleWarn" style="display:none;font-size:12px;padding:2px 6px;background:#fff3e0;border-color:#e65100;color:#bf360c"></button></div>
- <div id="bar">
-  <button id="mSnap" class="on" title="Tap points; routed on trails">📍 Snap</button>
-  <button id="mFree" title="Drag to draw freehand">✏️ Freehand</button>
-  <button id="mWpt" title="Tap map to drop a waypoint">📌 Waypoint</button><button id="wList" title="Waypoint list">📋 0</button>
-  <button id="undo">↶ Undo</button><button id="clear">🗑 Clear</button><button id="exp">⬇ GPX</button><button id="imp" title="Import a GPX file">📂 Import</button><input type="file" id="impFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" style="display:none"><button id="loc" title="My location">◎</button>
- </div>
- <div id="pwrap"><canvas id="profile"></canvas><div id="scrubRow" aria-live="polite"><span class="mut">Drag along the profile (or hover/tap the route) to scrub</span></div></div>
+<meta name="description" content="Plan trail routes on real paths, see the elevation profile, and export GPX for your watch.">
+<meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#1c1c1e" media="(prefers-color-scheme: dark)">
+<meta name="color-scheme" content="light dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Trail Planner">
+<link rel="icon" href="icons/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="icons/icon-192.png" sizes="192x192" type="image/png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<!-- Icon set: SF-Symbols-style line icons drawn for this app (24px grid, 1.8 stroke). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+ <defs>
+  <symbol id="i-snap" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.9-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 15.1 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.4"/></symbol>
+  <symbol id="i-free" viewBox="0 0 24 24"><path d="M3.5 17.5c2.5-5 4.6-5.2 6 -2.2s3.6 2.6 5.2-1.8 3.4-5.8 5.8-4.5"/><path d="M17.5 4.5l2 2"/></symbol>
+  <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.5 21V4"/><path d="M5.5 4.5h11.5l-2.2 4 2.2 4H5.5"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14.5 4 9.5l5-5"/><path d="M4 9.5h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
+  <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l.9 12.2a1.5 1.5 0 0 0 1.5 1.3h6.2a1.5 1.5 0 0 0 1.5-1.3L17.5 7"/><path d="M10.2 11v5.5M13.8 11v5.5"/></symbol>
+  <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></symbol>
+  <symbol id="i-import" viewBox="0 0 24 24"><path d="M8 3.5h6l4.5 4.5v11a1.5 1.5 0 0 1-1.5 1.5H8A1.5 1.5 0 0 1 6.5 19V5A1.5 1.5 0 0 1 8 3.5z"/><path d="M14 3.5V8h4.5"/><path d="M12.25 11v6M9.5 14l2.75-3 2.75 3"/></symbol>
+  <symbol id="i-locate" viewBox="0 0 24 24"><path d="M20.5 3.5 3.5 10.6l7.2 2.7 2.7 7.2z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11"/><circle cx="4.75" cy="6.5" r=".9"/><circle cx="4.75" cy="12" r=".9"/><circle cx="4.75" cy="17.5" r=".9"/></symbol>
+  <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.75L12 13 3.5 8.25z"/><path d="m3.5 12.25 8.5 4.75 8.5-4.75"/><path d="m3.5 16.25 8.5 4.75 8.5-4.75"/></symbol>
+  <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.75"/><path d="M9.6 9.4a2.5 2.5 0 1 1 3.6 2.3c-.75.35-1.2.95-1.2 1.8v.3"/><path d="M12 16.9v.1"/></symbol>
+  <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m6.5 9.5 5.5 5.5 5.5-5.5"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/></symbol>
+  <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><circle cx="12" cy="12" r="2.5"/><path d="M12 2.5v2.5M12 19v2.5M2.5 12H5M19 12h2.5"/></symbol>
+  <symbol id="i-warn" viewBox="0 0 24 24"><path d="M10.4 4.3 2.9 17.5A1.8 1.8 0 0 0 4.5 20.2h15a1.8 1.8 0 0 0 1.6-2.7L13.6 4.3a1.8 1.8 0 0 0-3.2 0z"/><path d="M12 9.5v4.5M12 17v.1"/></symbol>
+  <symbol id="i-grade" viewBox="0 0 24 24"><path d="M3 19.5h18"/><path d="m3.5 16.5 5-6 3.5 3 3.5-6.5 5 9.5"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+  <symbol id="i-minus" viewBox="0 0 24 24"><path d="M5 12h14"/></symbol>
+  <symbol id="i-drink" viewBox="0 0 24 24"><path d="M12 3.5s6 6.4 6 10.9a6 6 0 0 1-12 0c0-4.5 6-10.9 6-10.9z"/></symbol>
+  <symbol id="i-food" viewBox="0 0 24 24"><path d="M7.5 3.5v17M5 3.5v4.5a2.5 2.5 0 0 0 5 0V3.5"/><path d="M17.5 20.5V3.5c-2.2.6-3.5 3.3-3.5 7.5h3.5"/></symbol>
+  <symbol id="i-view" viewBox="0 0 24 24"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+  <symbol id="i-wc" viewBox="0 0 24 24"><circle cx="7.5" cy="5" r="1.6"/><circle cx="16.5" cy="5" r="1.6"/><path d="M7.5 8.5v12M5.5 9h4v6M14.5 9h4l1.5 6.5h-7zM15.5 15.5v5M17.5 15.5v5"/></symbol>
+  <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9"/></symbol>
+ </defs>
+</svg>
+
+<div id="map" role="application" aria-label="Map. Click to add route points."></div>
+
+<div id="hint" class="hint" role="status" aria-live="polite" hidden>
+ <svg class="ic"><use href="#i-snap"/></svg><span id="hintText">Click the map to start your route</span>
 </div>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-"use strict";
-const HOME=[-41.1050,174.8400]; // Titahi Bay, Porirua
-const BROUTER="https://brouter.de/brouter", PROFILE="hiking-mountain";
-const map=L.map('map',{zoomControl:true}).setView(HOME,14);
-const osm=L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap contributors'});
-const topo=L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',{maxZoom:17,attribution:'© OpenStreetMap, SRTM | © OpenTopoMap (CC-BY-SA)'});
-topo.addTo(map);L.control.layers({'OpenTopoMap':topo,'OpenStreetMap':osm}).addTo(map);
-L.control.scale({imperial:false}).addTo(map);
-map.on("locationfound",e=>map.setView(e.latlng,15));
+<div id="msg" class="toast" role="status" aria-live="polite"></div>
 
-// ---- state: anchors[i] = {lat,lng}; segs[i] joins anchors[i]->anchors[i+1]: {mode,pts:[[lat,lng,ele|null]],fallback}
-let mode='snap',anchors=[],segs=[],markers=[],lines=[],pending=0;
-const $=id=>document.getElementById(id);
-function toast(t,ms=3000){const m=$('msg');m.textContent=t;m.style.display='block';clearTimeout(toast.t);toast.t=setTimeout(()=>m.style.display='none',ms)}
-function setBusy(d){pending+=d;$('busy').textContent=pending>0?'⏳':'';if(typeof updEleWarn==='function'&&!pending)updEleWarn()}
+<!-- Map controls (top right): layers, locate, zoom -->
+<div id="mapCtl" class="mapctl">
+ <div class="ctl-group">
+  <button id="layersBtn" class="ctl" aria-label="Map style" aria-haspopup="true" aria-expanded="false" data-tip="Map style"><svg class="ic"><use href="#i-layers"/></svg></button>
+ </div>
+ <div class="ctl-group">
+  <button id="loc" class="ctl" aria-label="Show my location" data-tip="My location  L"><svg class="ic"><use href="#i-locate"/></svg></button>
+ </div>
+ <div class="ctl-group ctl-zoom">
+  <button id="zIn" class="ctl" aria-label="Zoom in" data-tip="Zoom in  +"><svg class="ic"><use href="#i-plus"/></svg></button>
+  <button id="zOut" class="ctl" aria-label="Zoom out" data-tip="Zoom out  −"><svg class="ic"><use href="#i-minus"/></svg></button>
+ </div>
+ <div id="layersPop" class="popover" role="menu" hidden></div>
+</div>
 
-// ---- geo utils
-function hav(a,b){const R=6371008.8,r=Math.PI/180,dl=(b[0]-a[0])*r,dg=(b[1]-a[1])*r;const h=Math.sin(dl/2)**2+Math.cos(a[0]*r)*Math.cos(b[0]*r)*Math.sin(dg/2)**2;return 2*R*Math.asin(Math.sqrt(h))}
-function densify(a,b,step=25){const d=hav(a,b),n=Math.max(1,Math.ceil(d/step)),o=[];for(let i=0;i<=n;i++)o.push([a[0]+(b[0]-a[0])*i/n,a[1]+(b[1]-a[1])*i/n,null]);return o}
+<div id="ui">
+ <!-- Sidebar (desktop) / top of bottom sheet (phone) -->
+ <aside id="side" class="glass" aria-label="Route tools">
+  <header class="brand">
+   <img src="icons/favicon.svg" alt="" width="28" height="28">
+   <div class="brand-t"><h1>Trail Planner</h1><p>Plan · Profile · Export GPX</p></div>
+   <button id="helpBtn" class="icon-btn" aria-label="Keyboard shortcuts" data-tip="Shortcuts  ?"><svg class="ic"><use href="#i-keyboard"/></svg></button>
+  </header>
 
-// ---- elevation (Open-Meteo primary, Open-Elevation fallback; both CORS-enabled, keyless)
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-const okNum=v=>typeof v==='number'&&isFinite(v)&&v>-500&&v<9000;
-async function getJSON(url,opt,tries=3){ // retries with exponential backoff (+ honours 429/5xx)
-  for(let k=0;k<tries;k++){
-    try{const ctl=new AbortController(),t=setTimeout(()=>ctl.abort(),15000);
-      const r=await fetch(url,{...opt,signal:ctl.signal});clearTimeout(t);
-      if(r.ok)return await r.json();
-      if(r.status<429&&r.status!==408)return null; // permanent client error
-    }catch(e){}
-    if(k<tries-1)await sleep(600*2**k+Math.random()*300)}
-  return null}
-let eleWarn=0;
-async function fillEle(pts){ // fills p[2] in place; returns number still missing
-  const need=pts.filter(p=>p[2]==null||!okNum(p[2]));
-  for(let i=0;i<need.length;i+=100){
-    const ch=need.slice(i,i+100);let ele=null;
-    let j=await getJSON(`https://api.open-meteo.com/v1/elevation?latitude=${ch.map(p=>p[0].toFixed(6)).join(',')}&longitude=${ch.map(p=>p[1].toFixed(6)).join(',')}`);
-    if(j&&Array.isArray(j.elevation))ele=j.elevation;
-    if(!ele||!ele.some(okNum)){j=await getJSON('https://api.open-elevation.com/api/v1/lookup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations:ch.map(p=>({latitude:p[0],longitude:p[1]}))})});
-      if(j&&Array.isArray(j.results))ele=j.results.map(x=>x.elevation)}
-    if(ele)ch.forEach((p,k)=>p[2]=okNum(ele[k])?ele[k]:null);else ch.forEach(p=>p[2]=null);
-    if(need.length>100)await sleep(150)}
-  const miss=pts.filter(p=>p[2]==null).length;updEleWarn();return miss}
-function allPts(){const o=[];segs.forEach(s=>o.push(...s.pts));return o}
-function updEleWarn(){const n=allPts().filter(p=>p[2]==null).length+wpts.filter(w=>w.ele==null).length;eleWarn=n;
-  const b=$('eleWarn');if(!b)return;b.style.display=n&&!pending?'inline-block':'none';b.textContent=`⚠ No elevation for ${n} pt${n>1?'s':''} – retry`}
-async function backfillAll(){setBusy(1);try{await fillEle(allPts());for(const w of wpts)if(w.ele==null){const p=[w.lat,w.lng,null];await fillEle([p]);w.ele=p[2]}}finally{setBusy(-1)}save();render();renderW();return eleWarn}
-function interpEle(pts){ // last resort: fill gaps linearly from neighbours (only between known values)
-  let last=-1;for(let i=0;i<pts.length;i++){if(pts[i][2]==null)continue;
-    if(last>=0&&i-last>1){for(let k=last+1;k<i;k++)pts[k][2]=pts[last][2]+(pts[i][2]-pts[last][2])*(k-last)/(i-last)}last=i}}
+  <section class="stats" aria-label="Route statistics">
+   <div class="stat stat-main"><span class="lbl">Distance</span><span class="val" id="dist">0.00 <small>km</small></span></div>
+   <div class="stat"><span class="lbl">Ascent</span><span class="val up" id="asc">↑0 <small>m</small></span></div>
+   <div class="stat"><span class="lbl">Descent</span><span class="val dn" id="desc">↓0 <small>m</small></span></div>
+   <div class="stat"><span class="lbl">Est. time</span><span class="val" id="eTime">–</span></div>
+   <div class="stat stat-x"><span class="lbl">Lowest</span><span class="val" id="eMin">–</span></div>
+   <div class="stat stat-x"><span class="lbl">Highest</span><span class="val" id="eMax">–</span></div>
+  </section>
 
-// ---- routing
-async function route(a,b){
-  const url=`${BROUTER}?lonlats=${a.lng.toFixed(6)},${a.lat.toFixed(6)}|${b.lng.toFixed(6)},${b.lat.toFixed(6)}&profile=${PROFILE}&alternativeidx=0&format=geojson`;
-  try{const ctl=new AbortController();const t=setTimeout(()=>ctl.abort(),20000);
-    const r=await fetch(url,{signal:ctl.signal});clearTimeout(t);
-    if(!r.ok)throw new Error(await r.text());
-    const g=await r.json();const c=g.features[0].geometry.coordinates;
-    return {pts:c.map(x=>[x[1],x[0],x.length>2?x[2]:null]),fallback:false};
-  }catch(e){console.warn('BRouter failed',e);toast('No trail route found – used straight line');
-    return {pts:densify([a.lat,a.lng],[b.lat,b.lng]),fallback:true}}
-}
-async function buildSeg(i){ // (re)compute segs[i]
-  const s=segs[i],a=anchors[i],b=anchors[i+1];setBusy(1);
-  try{
-    if(s.mode==='snap'){const r=await route(a,b);if(segs[i]!==s)return;s.pts=r.pts;s.fallback=r.fallback}
-    else{const pv=i>0&&segs[i-1].pts.length?segs[i-1].pts.at(-1):null;s.pts[0]=pv?[pv[0],pv[1],null]:[a.lat,a.lng,null];s.pts[s.pts.length-1]=[b.lat,b.lng,null]}
-    await fillEle(s.pts);
-  }finally{setBusy(-1)}
-  if(segs[i]===s)render();
-}
+  <div class="seg" role="group" aria-label="Drawing mode">
+   <button id="mSnap" class="on" aria-pressed="true" data-tip="Snap to trails  S"><svg class="ic"><use href="#i-snap"/></svg><span>Snap</span></button>
+   <button id="mFree" aria-pressed="false" data-tip="Freehand drawing  F"><svg class="ic"><use href="#i-free"/></svg><span>Freehand</span></button>
+   <button id="mWpt" aria-pressed="false" data-tip="Drop waypoints  W"><svg class="ic"><use href="#i-flag"/></svg><span>Waypoint</span></button>
+  </div>
+  <p id="modeHint" class="mode-hint">Click the map to add points. Each leg follows real trails.</p>
 
-// ---- interaction
-function addAnchor(ll){anchors.push({lat:ll.lat,lng:ll.lng});addMarker(anchors.length-1)}
-function addMarker(i){
-  const m=L.marker(anchors[i],{draggable:mode==='snap',icon:L.divIcon({className:'',html:`<div style="width:16px;height:16px;border-radius:50%;background:${i?'#fff':'#2e7d32'};border:3px solid #1b5e20"></div>`,iconSize:[16,16],iconAnchor:[8,8]})}).addTo(map);
-  m.on('dragend',()=>{const idx=markers.indexOf(m),ll=m.getLatLng();anchors[idx]={lat:ll.lat,lng:ll.lng};
-    if(idx>0)buildSeg(idx-1);if(idx<segs.length)buildSeg(idx);save()});
-  markers.push(m);
-}
-map.on('click',e=>{if(mode==='wpt'){addWpt(e.latlng);return}if(mode!=='snap')return;
-  addAnchor(e.latlng);if(anchors.length>1){segs.push({mode:'snap',pts:[]});buildSeg(segs.length-1)}save()});
+  <div class="actions">
+   <button id="undo" class="btn" aria-label="Undo last point" data-tip="Undo  ⌘Z / Ctrl+Z"><svg class="ic"><use href="#i-undo"/></svg><span>Undo</span></button>
+   <button id="clear" class="btn" aria-label="Clear route" data-tip="Clear route"><svg class="ic"><use href="#i-trash"/></svg><span>Clear</span></button>
+   <button id="imp" class="btn" aria-label="Import GPX" data-tip="Import GPX  I"><svg class="ic"><use href="#i-import"/></svg><span>Import</span></button>
+   <button id="wList" class="btn" aria-label="Waypoints" aria-expanded="false" data-tip="Waypoint list"><svg class="ic"><use href="#i-list"/></svg><span class="wl-t">Waypoints</span><span class="badge" id="wCount">0</span></button>
+   <button id="exp" class="btn primary" aria-label="Export GPX" data-tip="Export GPX  E"><svg class="ic"><use href="#i-export"/></svg><span>Export<span class="dk"> GPX</span></span></button>
+   <input type="file" id="impFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden>
+  </div>
 
-// freehand drawing with pointer events
-let drawing=null,drawLine=null;const mc=map.getContainer();
-mc.addEventListener('pointerdown',e=>{if(mode!=='free'||e.target.closest('.leaflet-control'))return;
-  e.preventDefault();e.stopPropagation();mc.setPointerCapture(e.pointerId);const ll=map.mouseEventToLatLng(e);
-  drawing=[];if(anchors.length){const pv=segs.length&&segs.at(-1).pts.length?segs.at(-1).pts.at(-1):[anchors.at(-1).lat,anchors.at(-1).lng];drawing.push([pv[0],pv[1],null])}
-  drawing.push([ll.lat,ll.lng,null]);drawLine=L.polyline(drawing,{color:'#e65100',weight:4,dashArray:'4 6'}).addTo(map)},true);
-mc.addEventListener('pointermove',e=>{if(!drawing)return;const ll=map.mouseEventToLatLng(e),p=[ll.lat,ll.lng,null];
-  if(hav(drawing.at(-1),p)>=8){drawing.push(p);drawLine.setLatLngs(drawing)}});
-function endDraw(){if(!drawing)return;const pts=drawing;drawing=null;map.removeLayer(drawLine);
-  if(!anchors.length){addAnchor({lat:pts[0][0],lng:pts[0][1]})}
-  if(pts.length<2||hav(pts[0],pts.at(-1))<5&&pts.length<3){save();render();return}
-  // densify long gaps (max 30 m) so freehand lines carry elevation detail
-  const d=[pts[0]];for(let i=1;i<pts.length;i++){const s=densify(pts[i-1],pts[i],30);d.push(...s.slice(1))}
-  const end=pts.at(-1);addAnchor({lat:end[0],lng:end[1]});segs.push({mode:'free',pts:d});buildSeg(segs.length-1);save()}
-mc.addEventListener('pointerup',endDraw);mc.addEventListener('pointercancel',endDraw);
+  <div class="status-row">
+   <span id="busy" class="busy" aria-live="polite"></span>
+   <button id="eleWarn" class="warn-pill" style="display:none"></button>
+  </div>
 
-function setMode(m){mode=m;$('mSnap').classList.toggle('on',m==='snap');$('mFree').classList.toggle('on',m==='free');
-  document.body.classList.toggle('drawing',m==='free');$('mWpt').classList.toggle('on',m==='wpt');document.body.classList.toggle('wptmode',m==='wpt');
-  markers.forEach(k=>k.dragging&&(m==='free'?k.dragging.disable():k.dragging.enable()));
-  if(m==='free'){map.dragging.disable();toast('Freehand: drag to draw. Pinch/buttons to zoom.')}else map.dragging.enable();if(m==='wpt')toast('Waypoint: tap the map to drop one')}
-$('mSnap').onclick=()=>setMode('snap');$('mWpt').onclick=()=>setMode('wpt');$('mFree').onclick=()=>setMode('free');
-$('undo').onclick=()=>{if(!anchors.length)return;anchors.pop();map.removeLayer(markers.pop());if(segs.length>=anchors.length&&segs.length)segs.pop();render();save()};
-$('clear').onclick=()=>{if(anchors.length&&!confirm('Clear the whole route?'))return;anchors=[];segs=[];markers.forEach(m=>map.removeLayer(m));markers=[];if(wpts.length&&confirm('Also delete the '+wpts.length+' waypoint(s)?'))while(wpts.length)delWpt(0);render();save()};
+  <div id="wpts" class="wpts" aria-label="Waypoints"></div>
 
-// ---- stats
-function trackPts(){const o=[];segs.forEach(s=>s.pts.forEach((p,k)=>{if(k===0&&o.length)return;o.push(p)}));return o}
-function climb(pts,th=3){let up=0,dn=0,ref=null;for(const p of pts){if(p[2]==null)continue;if(ref==null){ref=p[2];continue}
-  const d=p[2]-ref;if(d>=th){up+=d;ref=p[2]}else if(d<=-th){dn-=d;ref=p[2]}}return[up,dn]}
-function render(){
-  lines.forEach(l=>map.removeLayer(l));lines=segs.map(s=>L.polyline(s.pts.map(p=>[p[0],p[1]]),{color:s.imported?'#6a1b9a':s.mode==='free'?'#e65100':(s.fallback?'#c62828':'#1565c0'),weight:5,opacity:.85,dashArray:s.mode==='free'&&!s.imported?'8 6':null}).addTo(map));
-  const pts=trackPts();let dist=0;const prof=[];pts.forEach((p,i)=>{if(i)dist+=hav(pts[i-1],p);prof.push([dist,p[2]])});
-  SC.pts=pts;SC.cum=prof.map(q=>q[0]);SC.up=cumClimb(pts);SC.prof=prof;SC.D=dist;SC.gr=gradeArr(pts,SC.cum);gradeLines();scrubHit();
-  const [up,dn]=climb(pts);$('dist').innerHTML=`${(dist/1000).toFixed(2)} <small>km</small>`;
-  $('asc').innerHTML=`↑${Math.round(up)} <small>m</small>`;$('desc').innerHTML=`↓${Math.round(dn)} <small>m</small>`;drawProfile(prof)}
-function niceStep(r){const p=10**Math.floor(Math.log10(r||1)),f=r/p;return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*p}
-function drawProfile(prof){SC.prof=prof;SC.geo=null;const c=$('profile'),r=c.getBoundingClientRect(),dpr=devicePixelRatio||1;c.width=r.width*dpr;c.height=r.height*dpr;
-  const x=c.getContext('2d');x.scale(dpr,dpr);const W=r.width,H=r.height;x.clearRect(0,0,W,H);
-  const v=prof.filter(p=>p[1]!=null);if(v.length<2){x.fillStyle='#999';x.font='12px sans-serif';x.fillText('Elevation profile appears here',8,H/2);return}
-  const D=prof.at(-1)[0]||1;let lo=Math.min(...v.map(p=>p[1])),hi=Math.max(...v.map(p=>p[1]));if(hi-lo<20){hi=lo+20}
-  const big=H>=120,L0=big?52:34,R0=big?12:4,T=big?20:6,BY=H-(big?22:12);
-  if(big){const st=niceStep((hi-lo)/4);lo=Math.floor(lo/st)*st;hi=Math.ceil(hi/st)*st;if(hi-lo<st)hi=lo+st}
-  const X=d=>L0+d/D*(W-L0-R0),Y=e=>BY-(e-lo)/(hi-lo)*(BY-T);
-  if(big){x.font='12px sans-serif';x.lineWidth=1;const ys=niceStep((hi-lo)/4);x.textAlign='right';
-    for(let e=lo;e<=hi+.01;e+=ys){const y=Math.round(Y(e))+.5;x.strokeStyle='#e3e3e3';x.beginPath();x.moveTo(L0,y);x.lineTo(W-R0,y);x.stroke();x.fillStyle='#444';x.fillText(Math.round(e)+' m',L0-6,y+4)}
-    const xs=niceStep(D/1000/Math.max(2,Math.floor((W-L0)/90)))*1000;x.textAlign='center';
-    for(let d=0;d<=D+.01;d+=xs){const xx=Math.round(X(d))+.5;x.strokeStyle='#e3e3e3';x.beginPath();x.moveTo(xx,T);x.lineTo(xx,BY);x.stroke();x.fillStyle='#444';x.fillText((d/1000).toFixed(xs<1000?1:0)+' km',Math.min(Math.max(xx,L0+14),W-R0-16),H-6)}
-    x.textAlign='start';x.strokeStyle='#999';x.beginPath();x.moveTo(L0+.5,T);x.lineTo(L0+.5,BY+.5);x.lineTo(W-R0,BY+.5);x.stroke()}
-  const runs=[];let run=[];prof.forEach(p=>{if(p[1]==null){if(run.length)runs.push(run);run=[]}else run.push(p)});if(run.length)runs.push(run);
-  if(runs.length>1){x.fillStyle='rgba(0,0,0,.06)';for(let i=1;i<runs.length;i++)x.fillRect(X(runs[i-1].at(-1)[0]),T,X(runs[i][0][0])-X(runs[i-1].at(-1)[0]),BY-T)} // gaps = no elevation
-  const G=SC.prof===prof&&SC.gr&&SC.gr.length===prof.length?SC.gr:null;
-  if(G){for(let i=1;i<prof.length;i++){const a=prof[i-1],b=prof[i];if(a[1]==null||b[1]==null)continue;x.beginPath();x.moveTo(X(a[0]),BY);x.lineTo(X(a[0]),Y(a[1]));x.lineTo(X(b[0]),Y(b[1]));x.lineTo(X(b[0])+.6,BY);x.closePath();x.fillStyle=gCol(G[i],.75);x.fill()}}
-  runs.forEach(v=>{if(!G){x.beginPath();x.moveTo(X(v[0][0]),BY);v.forEach(p=>x.lineTo(X(p[0]),Y(p[1])));x.lineTo(X(v.at(-1)[0]),BY);x.closePath();x.fillStyle='rgba(46,125,50,.35)';x.fill()}
-    x.beginPath();v.forEach((p,i)=>i?x.lineTo(X(p[0]),Y(p[1])):x.moveTo(X(p[0]),Y(p[1])));x.strokeStyle='#1b5e20';x.lineWidth=1.5;x.stroke()});
-  if(!big){x.fillStyle='#333';x.font='10px sans-serif';x.fillText(Math.round(hi)+'m',0,10);x.fillText(Math.round(lo)+'m',0,BY);x.fillText((D/1000).toFixed(1)+' km',W-40,H-1)}
-  if(G){x.font=big?'11px sans-serif':'9px sans-serif';const ly=big?14:H-1;let lx=W-(big?R0:48);[...GB].reverse().forEach(b=>{const t=b[2],w=x.measureText(t).width+12;lx-=w;x.fillStyle=b[1];x.fillRect(lx,ly-8,8,8);x.fillStyle='#333';x.fillText(t,lx+10,ly)})}
-  SC.geo={L0,R0,BY,T,W,H,D,X,Y};scrubDecor(x)}
-addEventListener('resize',render);
+  <div class="prefs">
+   <label class="pref"><span>Pace</span>
+    <select id="pace" aria-label="Pace for time estimate">
+     <option value="4">Easy walk · 4 km/h</option><option value="5" selected>Hike · 5 km/h</option><option value="6">Fast hike · 6 km/h</option>
+     <option value="8">Jog · 8 km/h</option><option value="10">Run · 10 km/h</option><option value="12">Fast run · 12 km/h</option>
+    </select></label>
+   <p class="fine">Time uses Naismith's rule: flat pace plus 1 h per 600 m of climb (scaled to your pace).</p>
+  </div>
+ </aside>
 
-// ---- scrub along the trail: SC.pos = metres from start (null = off)
-// ---- gradient colouring (grade in %, smoothed over ~80 m)
-const GB=[[-10,'#1e88e5','↓10+'],[3,'#43a047','<3'],[6,'#fdd835','3–6'],[10,'#fb8c00','6–10'],[15,'#e53935','10–15'],[Infinity,'#7f0000','15+']];
-function gBand(g){if(g==null)return -1;if(g<=-10)return 0;for(let k=1;k<GB.length;k++)if(g<GB[k][0])return k;return GB.length-1}
-function gCol(g,a=1){const k=gBand(g);if(k<0)return `rgba(158,158,158,${a*.6})`;const h=GB[k][1];return a===1?h:`rgba(${parseInt(h.slice(1,3),16)},${parseInt(h.slice(3,5),16)},${parseInt(h.slice(5,7),16)},${a})`}
-function gradeArr(pts,cum,win=80){ // o[i] = smoothed grade of segment i-1→i (null if no elevation nearby)
-  const n=pts.length,o=new Array(n).fill(null);let l=0,r=0;
-  for(let i=1;i<n;i++){const c=(cum[i-1]+cum[i])/2;
-    while(l<i-1&&cum[l+1]<=c-win/2)l++;if(r<i)r=i;while(r<n-1&&cum[r+1]<=c+win/2)r++;
-    let a=l,b=r;while(a<b&&pts[a][2]==null)a++;while(b>a&&pts[b][2]==null)b--;
-    if(pts[i][2]==null&&pts[i-1][2]==null)continue;const dd=cum[b]-cum[a];if(dd>=20&&pts[a][2]!=null&&pts[b][2]!=null)o[i]=(pts[b][2]-pts[a][2])/dd*100}
-  if(n>1)o[0]=o[1];return o}
-let gOn=true,gLay=[];try{gOn=localStorage.getItem('tp-grade')!=='off'}catch(e){}
-function gradeLines(){gLay.forEach(l=>map.removeLayer(l));gLay=[];if(!gOn||!SC.pts.length)return;const P=SC.pts,G=SC.gr;let st=0;
-  for(let i=1;i<=P.length;i++){if(i===P.length||gBand(G[i])!==gBand(G[st+1])){if(i-1>st)gLay.push(L.polyline(P.slice(st,i).map(p=>[p[0],p[1]]),{color:gCol(G[st+1]),weight:5,opacity:1,interactive:false}).addTo(map));st=i-1}}}
-function setGrade(on){gOn=on;$('gTog').classList.toggle('on',on);try{localStorage.setItem('tp-grade',on?'':'off')}catch(e){}gradeLines()}
-const SC={pts:[],cum:[],up:[],prof:[],D:0,pos:null,geo:null,mk:null,hit:null};
-function cumClimb(pts,th=3){let up=0,dn=0,ref=null;return pts.map(p=>{if(p[2]!=null){if(ref==null)ref=p[2];else{const d=p[2]-ref;if(d>=th){up+=d;ref=p[2]}else if(d<=-th){dn-=d;ref=p[2]}}}return up})}
-function scrubIdx(d){const c=SC.cum;let lo=0,hi=c.length-1;while(hi-lo>1){const m=(lo+hi)>>1;if(c[m]<=d)lo=m;else hi=m}return lo}
-function eleAt(i,t){const P=SC.pts,a=P[i][2],b=P[Math.min(i+1,P.length-1)][2];if(a!=null&&b!=null)return a+(b-a)*t;if(a!=null&&t<.5)return a;if(b!=null&&t>=.5)return b;
-  let l=i;while(l>=0&&P[l][2]==null)l--;let r=i+1;while(r<P.length&&P[r][2]==null)r++;if(l>=0&&r<P.length){const dl=SC.cum[l],dr=SC.cum[r];return P[l][2]+(P[r][2]-P[l][2])*((SC.cum[i]+(SC.cum[Math.min(i+1,P.length-1)]-SC.cum[i])*t)-dl)/((dr-dl)||1)}return null}
-function scrubState(d){const P=SC.pts;if(P.length<2||d==null)return null;d=Math.max(0,Math.min(SC.D,d));const i=scrubIdx(d),j=Math.min(i+1,P.length-1),seg=SC.cum[j]-SC.cum[i],t=seg>0?(d-SC.cum[i])/seg:0;
-  const ll=[P[i][0]+(P[j][0]-P[i][0])*t,P[i][1]+(P[j][1]-P[i][1])*t];const e=eleAt(i,t),interp=P[i][2]==null||P[j][2]==null;
-  return{d,ll,ele:e,interp,up:SC.up[i]||0,left:SC.D-d,i}}
-function setScrub(d){SC.pos=d;scrubUpdate()}
-function scrubUpdate(){const s=scrubState(SC.pos),row=$('scrubRow');
-  if(!s){if(SC.mk){map.removeLayer(SC.mk);SC.mk=null}SC.pos=null;row.innerHTML=SC.pts.length<2?'<span class="mut">Elevation profile – draw a route to scrub along it</span>':'<span class="mut">Drag along the profile (or hover/tap the route) to scrub</span>';drawProfile(SC.prof);return}
-  if(!SC.mk)SC.mk=L.marker(s.ll,{interactive:false,keyboard:false,zIndexOffset:2000,icon:L.divIcon({className:'',html:'<div class="scrubDot"></div>',iconSize:[16,16],iconAnchor:[8,8]})}).addTo(map);else SC.mk.setLatLng(s.ll);
-  row.innerHTML=`<b id="scD">${(s.d/1000).toFixed(2)} km</b><span id="scL" class="mut">${(s.left/1000).toFixed(2)} km to go</span><span id="scE">⛰ ${s.ele==null?'– m (no data)':Math.round(s.ele)+' m'+(s.interp?'*':'')}</span><span id="scG" style="color:${gCol(SC.gr[s.i+1]??SC.gr[s.i])}">∠ ${(()=>{const g=SC.gr[s.i+1]??SC.gr[s.i];return g==null?'–':(g>0?'+':'')+g.toFixed(1)})()}%</span><span id="scU">↑${Math.round(s.up)} m so far</span><button id="scX" style="padding:0 6px;font-size:12px" title="Hide marker">✕</button>`;
-  $('scX').onclick=()=>setScrub(null);drawProfile(SC.prof)}
-function wptDist(w){const P=SC.pts;if(P.length<2)return null;let bi=0,bd=Infinity;for(let i=0;i<P.length;i++){const d=hav(P[i],[w.lat,w.lng]);if(d<bd){bd=d;bi=i}}return bd<=200?SC.cum[bi]:null}
-function scrubDecor(x){const g=SC.geo;if(!g)return;
-  wpts.forEach(w=>{const d=wptDist(w);if(d==null)return;const X=g.X(d);x.strokeStyle='#6a1b9a';x.lineWidth=1.5;x.beginPath();x.moveTo(X,g.BY);x.lineTo(X,g.BY-8);x.stroke();
-    x.font='11px sans-serif';x.textAlign='center';x.fillText((WTYPES[w.type]||WTYPES.other).icon,X,g.BY-10);x.textAlign='start'});
-  const s=scrubState(SC.pos);if(!s)return;const X=g.X(s.d);x.strokeStyle='#d81b60';x.lineWidth=1.5;x.beginPath();x.moveTo(X,g.T);x.lineTo(X,g.BY);x.stroke();
-  if(s.ele!=null){x.fillStyle='#d81b60';x.beginPath();x.arc(X,g.Y(s.ele),4,0,7);x.fill()}}
-(()=>{const c=$('profile');let id=null;
-  const at=e=>{const g=SC.geo;if(!g||SC.pts.length<2)return;const r=c.getBoundingClientRect();setScrub((e.clientX-r.left-g.L0)/(g.W-g.L0-g.R0)*g.D)};
-  c.addEventListener('pointerdown',e=>{if(SC.pts.length<2)return;e.preventDefault();id=e.pointerId;try{c.setPointerCapture(id)}catch(_){}at(e)});
-  c.addEventListener('pointermove',e=>{if(id===e.pointerId){e.preventDefault();at(e)}});
-  const up=e=>{if(id===e.pointerId)id=null};c.addEventListener('pointerup',up);c.addEventListener('pointercancel',up);
-  // iOS Safari: block page scroll / rubber-band while finger is on the chart
-  c.addEventListener('touchstart',e=>{if(SC.pts.length>=2)e.preventDefault()},{passive:false});c.addEventListener('touchmove',e=>e.preventDefault(),{passive:false});
-  L.DomEvent.disableClickPropagation($('panel'));L.DomEvent.disableScrollPropagation($('panel'));})();
-function nearestDist(ll){const P=SC.pts;let bi=0,bd=Infinity;const k=Math.cos(ll.lat*Math.PI/180);
-  for(let i=0;i<P.length-1;i++){const ax=P[i][1]*k,ay=P[i][0],bx=P[i+1][1]*k,by=P[i+1][0],dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy;let t=L2?((ll.lng*k-ax)*dx+(ll.lat-ay)*dy)/L2:0;t=Math.max(0,Math.min(1,t));
-    const d=(ll.lng*k-ax-t*dx)**2+(ll.lat-ay-t*dy)**2;if(d<bd){bd=d;bi=i+t}}const i=Math.floor(bi);return SC.cum[i]+(SC.cum[Math.min(i+1,P.length-1)]-SC.cum[i])*(bi-i)}
-function scrubHit(){if(SC.hit){map.removeLayer(SC.hit);SC.hit=null}if(SC.pts.length<2){scrubUpdate();return}
-  // wide invisible line on top of the route: hover (desktop) / tap (mobile) sets the scrub point; clicks still bubble to the map so Snap/Waypoint taps behave as before
-  SC.hit=L.polyline(SC.pts.map(p=>[p[0],p[1]]),{weight:22,opacity:0,color:'#000',className:'scrubHit'}).addTo(map);
-  SC.hit.on('mousemove click',e=>{if(mode!=='free')setScrub(nearestDist(e.latlng))});scrubUpdate()}
-function setPanel(col){document.body.classList.toggle('pcol',col);$('pTog').textContent=col?'▸ Profile':'▾ Profile';try{localStorage.setItem('tp-ui',col?'col':'')}catch(e){}
-  map.invalidateSize();render()}
-// desktop: drag handle to resize the panel; height remembered in localStorage tp-ph
-(()=>{const h=$('pHandle'),root=document.documentElement;let sy=null,sh=0;
-  const setH=px=>{px=Math.round(Math.max(230,Math.min(innerHeight*.75,px)));root.style.setProperty('--ph-desk',px+'px');return px};
-  try{const v=+localStorage.getItem('tp-ph');if(v)setH(v)}catch(e){}
-  h.addEventListener('pointerdown',e=>{e.preventDefault();sy=e.clientY;sh=$('panel').offsetHeight;h.setPointerCapture(e.pointerId)});
-  h.addEventListener('pointermove',e=>{if(sy==null)return;setH(sh+sy-e.clientY);map.invalidateSize();drawProfile(SC.prof)});
-  const end=()=>{if(sy==null)return;sy=null;const px=setH($('panel').offsetHeight);try{localStorage.setItem('tp-ph',px)}catch(e){}map.invalidateSize();render()};
-  h.addEventListener('pointerup',end);h.addEventListener('pointercancel',end)})();
-$('gTog').onclick=()=>setGrade(!gOn);if(!gOn)$('gTog').classList.remove('on');
-$('pTog').onclick=()=>setPanel(!document.body.classList.contains('pcol'));
-try{if(localStorage.getItem('tp-ui')==='col')document.body.classList.add('pcol'),$('pTog').textContent='▸ Profile'}catch(e){}
-$("loc").onclick=()=>map.locate({enableHighAccuracy:true});
+ <!-- Elevation profile -->
+ <section id="panel" class="glass" aria-label="Elevation profile">
+  <div id="pHandle" role="separator" aria-orientation="horizontal" aria-label="Resize profile" tabindex="0" data-tip="Drag to resize"></div>
+  <div class="p-head">
+   <h2>Elevation</h2>
+   <div id="scrubRow" aria-live="polite"></div>
+   <div class="p-tools">
+    <button id="gTog" class="chip on" aria-pressed="true" data-tip="Colour route by gradient  G"><svg class="ic"><use href="#i-grade"/></svg><span>Grade</span></button>
+    <button id="pTog" class="icon-btn" aria-label="Collapse profile" aria-expanded="true" data-tip="Show/hide profile  P"><svg class="ic"><use href="#i-chevron"/></svg></button>
+   </div>
+  </div>
+  <div id="legend" class="legend" aria-hidden="true"></div>
+  <div id="pwrap"><div id="pEmpty" hidden><svg class="ic"><use href="#i-grade"/></svg><b>No elevation profile yet</b><span>Add two or more points and the profile appears here.</span></div><canvas id="profile" role="img" aria-label="Elevation profile. Drag to move the marker along the route; arrow keys step along it." tabindex="0"></canvas></div>
+ </section>
+</div>
 
-// ---- GPX export
-function simplify(pts,tol){ // Douglas-Peucker in local metres
-  if(pts.length<3)return pts;const r=Math.PI/180,k=Math.cos(pts[0][0]*r)*6371008.8*r,m=6371008.8*r;
-  const P=pts.map(p=>[p[1]*k,p[0]*m]),keep=new Uint8Array(pts.length);keep[0]=keep[pts.length-1]=1;const st=[[0,pts.length-1]];
-  while(st.length){const[a,b]=st.pop();let md=0,mi=-1;const[ax,ay]=P[a],[bx,by]=P[b],dx=bx-ax,dy=by-ay,L2=dx*dx+dy*dy||1;
-    for(let i=a+1;i<b;i++){let t=((P[i][0]-ax)*dx+(P[i][1]-ay)*dy)/L2;t=Math.max(0,Math.min(1,t));const d=Math.hypot(P[i][0]-ax-t*dx,P[i][1]-ay-t*dy);if(d>md){md=d;mi=i}}
-    if(md>tol){keep[mi]=1;st.push([a,mi],[mi,b])}}
-  return pts.filter((_,i)=>keep[i])}
-const esc=s=>s.replace(/[<>&"']/g,c=>({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;',"'":'&apos;'}[c]));
-function makeGpx(name,pts,wps=wpts){
-  // simplify to ~2 m, keep under ~3000 pts (safe for older Garmin course limits)
-  let tol=2,out=simplify(pts,tol);while(out.length>3000){tol*=1.5;out=simplify(pts,tol)}
-  const n=esc(name);return `<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="Trail Planner" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
-  <metadata><name>${n}</name><time>${new Date().toISOString().replace(/\.\d+Z/,'Z')}</time></metadata>
-${wps.map(w=>`  <wpt lat="${(+w.lat).toFixed(6)}" lon="${(+w.lng).toFixed(6)}">${w.ele!=null?`<ele>${(+w.ele).toFixed(1)}</ele>`:''}<name>${esc(w.name||WTYPES[w.type].label)}</name><sym>${esc((WTYPES[w.type]||WTYPES.other).sym)}</sym><type>${w.type}</type></wpt>\n`).join('')}  <trk><name>${n}</name><type>trail_running</type><trkseg>
-${out.map(p=>`    <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}">${p[2]!=null?`<ele>${(+p[2]).toFixed(1)}</ele>`:''}</trkpt>`).join('\n')}
-  </trkseg></trk>
-</gpx>
-`}
-$('exp').onclick=async()=>{const pts=trackPts();if(pts.length<2)return toast('Draw a route first');if(pending)return toast('Still loading route/elevation…');
-  if(await backfillAll()){interpEle(trackPts());const n=trackPts().filter(p=>p[2]==null).length;render();
-    if(n&&!confirm(`Elevation service unavailable: ${n} of ${trackPts().length} track points have no elevation. Your watch/app will show no climb for those.\n\nExport anyway (points without data get no <ele>)?`))return}
-  const name=(prompt('Route name',importName||'Titahi Bay trail run')||'').trim();if(!name)return;
-  const gpx=makeGpx(name,trackPts()),fn=name.replace(/[^\w\- ]+/g,'').trim().replace(/\s+/g,'_')+'.gpx';
-  const file=new File([gpx],fn,{type:'application/gpx+xml'});
-  if(navigator.canShare&&navigator.canShare({files:[file]})&&/Mobi|Android|iPhone|iPad/.test(navigator.userAgent)){try{await navigator.share({files:[file],title:name});return}catch(e){if(e.name==='AbortError')return}}
-  const a=document.createElement('a');a.href=URL.createObjectURL(file);a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000)};
+<dialog id="help" aria-labelledby="helpTitle">
+ <form method="dialog">
+  <header><h2 id="helpTitle">Keyboard shortcuts</h2><button class="icon-btn" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></header>
+  <dl class="keys">
+   <dt><kbd>S</kbd></dt><dd>Snap mode: points follow trails</dd>
+   <dt><kbd>F</kbd></dt><dd>Freehand mode: drag to draw</dd>
+   <dt><kbd>W</kbd></dt><dd>Waypoint mode</dd>
+   <dt><kbd>⌘</kbd><kbd>Z</kbd> / <kbd>Ctrl</kbd><kbd>Z</kbd></dt><dd>Undo last point</dd>
+   <dt><kbd>E</kbd></dt><dd>Export GPX</dd>
+   <dt><kbd>I</kbd></dt><dd>Import GPX</dd>
+   <dt><kbd>G</kbd></dt><dd>Colour route by grade on/off</dd>
+   <dt><kbd>P</kbd></dt><dd>Show/hide elevation profile</dd>
+   <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Move along the route (hold <kbd>Shift</kbd> for 500 m)</dd>
+   <dt><kbd>L</kbd></dt><dd>Go to my location</dd>
+   <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Zoom</dd>
+   <dt><kbd>Esc</kbd></dt><dd>Hide marker / close panels</dd>
+   <dt><kbd>?</kbd></dt><dd>This sheet</dd>
+  </dl>
+ </form>
+</dialog>
 
-// ---- waypoints: {lat,lng,ele,name,type}
-const WTYPES={drink:{icon:'💧',label:'Drink stop',sym:'Drinking Water'},food:{icon:'🍴',label:'Food',sym:'Restaurant'},viewpoint:{icon:'👀',label:'Viewpoint',sym:'Scenic Area'},toilet:{icon:'🚻',label:'Toilet',sym:'Restroom'},other:{icon:'🚩',label:'Waypoint',sym:'Flag, Blue'}};
-let wpts=[],wmarkers=[];
-const wIcon=t=>L.divIcon({className:'',html:`<div class="wicon">${WTYPES[t].icon}</div>`,iconSize:[28,28],iconAnchor:[14,14]});
-function wMarker(w){const m=L.marker([w.lat,w.lng],{icon:wIcon(w.type),draggable:true,zIndexOffset:1000}).addTo(map);
-  m.bindTooltip(()=>esc(w.name),{direction:'top',offset:[0,-14]});
-  m.on('click',()=>{$('wpts').classList.add('open');renderW()});
-  m.on('dragend',async()=>{const ll=m.getLatLng();w.lat=ll.lat;w.lng=ll.lng;const p=[w.lat,w.lng,null];await fillEle([p]);w.ele=p[2];save();renderW()});
-  return m}
-async function addWpt(ll,type='drink',name){const w={lat:ll.lat,lng:ll.lng,ele:null,type,name:name||WTYPES[type].label};wpts.push(w);wmarkers.push(wMarker(w));
-  $('wpts').classList.add('open');renderW();save();const p=[w.lat,w.lng,null];await fillEle([p]);w.ele=p[2];save();renderW();return w}
-function delWpt(i){map.removeLayer(wmarkers[i]);wpts.splice(i,1);wmarkers.splice(i,1);renderW();save()}
-function renderW(){if(SC.geo||SC.prof.length)drawProfile(SC.prof);const el=$('wpts');$('wList').textContent='📋 '+wpts.length;
-  el.innerHTML=`<h4>Waypoints (${wpts.length}) <span style="float:right;cursor:pointer" id="wClose">✕</span></h4>`+(wpts.length?'':'<div class="wrow">None yet. Use 📌 Waypoint and tap the map.</div>')+
-  wpts.map((w,i)=>`<div class="wrow" data-i="${i}"><select>${Object.entries(WTYPES).map(([k,v])=>`<option value="${k}"${k===w.type?' selected':''}>${v.icon}</option>`).join('')}</select><input value="${esc(w.name)}" maxlength="40"><small>${w.ele!=null?Math.round(w.ele)+'m':''}</small><button class="wgo">🎯</button><button class="wdel">✕</button></div>`).join('');
-  $('wClose').onclick=()=>el.classList.remove('open');
-  el.querySelectorAll('.wrow[data-i]').forEach(r=>{const i=+r.dataset.i,w=wpts[i];
-    r.querySelector('select').onchange=e=>{const old=WTYPES[w.type].label;w.type=e.target.value;if(w.name===old||!w.name)w.name=WTYPES[w.type].label;wmarkers[i].setIcon(wIcon(w.type));save();renderW()};
-    r.querySelector('input').onchange=e=>{w.name=e.target.value.trim()||WTYPES[w.type].label;save()};
-    r.querySelector('.wgo').onclick=()=>map.setView([w.lat,w.lng],Math.max(map.getZoom(),15));
-    r.querySelector('.wdel').onclick=()=>delWpt(i)})}
-$('wList').onclick=()=>{$('wpts').classList.toggle('open');renderW()};
-
-// ---- GPX import: trk (all trksegs joined) or rte, plus wpt; keeps file <ele>, fetches the rest
-function parseGpx(text){const d=new DOMParser().parseFromString(text,'application/xml');if(d.getElementsByTagName('parsererror').length)throw new Error('Not valid XML');
-  const q=(el,t)=>Array.from(el.getElementsByTagNameNS('*',t));const pt=e=>{const ee=q(e,'ele')[0],v=ee?parseFloat(ee.textContent):NaN;return[parseFloat(e.getAttribute('lat')),parseFloat(e.getAttribute('lon')),okNum(v)?v:null]};
-  let pts=q(d,'trkpt').map(pt);if(!pts.length)pts=q(d,'rtept').map(pt);pts=pts.filter(p=>isFinite(p[0])&&isFinite(p[1]));
-  const nm=(q(d,'trk')[0]||q(d,'rte')[0]||q(d,'metadata')[0]);const name=nm&&q(nm,'name')[0]?q(nm,'name')[0].textContent.trim():'';
-  const SYM={'drinking water':'drink',restaurant:'food','scenic area':'viewpoint',restroom:'toilet'};
-  const w=q(d,'wpt').map(e=>{const p=pt(e),n=q(e,'name')[0],sy=q(e,'sym')[0],ty=q(e,'type')[0];let t=ty&&WTYPES[ty.textContent.trim()]?ty.textContent.trim():(sy&&SYM[sy.textContent.trim().toLowerCase()])||'other';
-    return{lat:p[0],lng:p[1],ele:p[2],type:t,name:(n&&n.textContent.trim())||WTYPES[t].label}}).filter(x=>isFinite(x.lat));
-  return{pts,wpts:w,name}}
-async function importGpx(text){const g=parseGpx(text);if(g.pts.length<2&&!g.wpts.length)return toast('No track, route or waypoints found in that GPX');
-  if((anchors.length||wpts.length)&&!confirm('Replace the current route and waypoints with the imported GPX?'))return;
-  anchors=[];segs=[];markers.forEach(m=>map.removeLayer(m));markers=[];while(wpts.length)delWpt(0);
-  let fresh=[];
-  if(g.pts.length>=2){const pts=g.pts.filter((p,i)=>!i||hav(g.pts[i-1],p)>0.5);addAnchor({lat:pts[0][0],lng:pts[0][1]});addAnchor({lat:pts.at(-1)[0],lng:pts.at(-1)[1]});
-    segs.push({mode:'free',imported:true,pts});fresh=pts}
-  g.wpts.forEach(w=>{wpts.push(w);wmarkers.push(wMarker(w))});renderW();
-  const b=fresh.length?L.latLngBounds(fresh.map(p=>[p[0],p[1]])):L.latLngBounds(g.wpts.map(w=>[w.lat,w.lng]));map.fitBounds(b,{padding:[30,30]});
-  importName=g.name;const had=fresh.filter(p=>p[2]!=null).length;render();save();
-  toast(`Imported ${fresh.length} pts${g.wpts.length?`, ${g.wpts.length} waypoints`:''}. Elevation: ${had===fresh.length?'from file':had?'partly from file, fetching rest…':'fetching…'}`,4000);
-  const miss=await backfillAll();if(miss)toast(`⚠ Elevation unavailable for ${miss} points – tap the warning to retry`,6000)}
-let importName='';
-$('imp').onclick=()=>$('impFile').click();
-$('impFile').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f)return;try{await importGpx(await f.text())}catch(err){toast('Could not read GPX: '+err.message,5000)}};
-$('eleWarn').onclick=async()=>{const n=await backfillAll();toast(n?`Still no elevation for ${n} points (service unavailable?)`:'Elevation filled ✓')};
-
-// ---- persistence
-function save(){try{localStorage.setItem('tp-route',JSON.stringify({anchors,segs,wpts}))}catch(e){}}
-try{const s=JSON.parse(localStorage.getItem('tp-route')||'null');if(s&&Array.isArray(s.wpts)){s.wpts.forEach(w=>{if(!WTYPES[w.type])w.type='other';wpts.push(w);wmarkers.push(wMarker(w))})}
-  if(s&&s.anchors){s.anchors.forEach(a=>addAnchor(a));segs=s.segs;if(anchors.length)map.fitBounds(L.latLngBounds(anchors),{padding:[30,30],maxZoom:16})}}catch(e){}
-render();renderW();if(eleWarn||allPts().some(p=>p[2]==null))backfillAll();
-window.TP={setGrade,gradeArr,gBand,setScrub,scrubState,SC,nearestDist,importGpx,parseGpx,backfillAll,interpEle,addWpt,makeGpx,simplify,climb,route,fillEle}; // for testing
-</script></body></html>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="app.js"></script>
+</body>
+</html>
