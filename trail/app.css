@@ -129,13 +129,15 @@ select{appearance:none;-webkit-appearance:none;border:0;border-radius:var(--r-s)
 .wpts h4{margin:0;padding:10px 8px 10px 12px;font-size:var(--fs-foot);font-weight:600;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--sep)}
 .wpts h4 .icon-btn{width:28px;height:28px}
 .wrows{max-height:260px;overflow:auto}
-.wrow{display:flex;gap:8px;align-items:center;padding:8px 8px 8px 10px;border-top:1px solid var(--sep)}
+.wrow{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:8px 8px 8px 10px;border-top:1px solid var(--sep)}
 .wrow:first-child{border-top:0}
 .wrow .wdot{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;color:#fff;flex:none}
 .wrow .wdot .ic{width:16px;height:16px;stroke-width:2}
 .wrow select{width:96px;padding:5px 24px 5px 8px;font-size:12px;background-position:right 6px center}
-.wrow input{flex:1;min-width:0;border:0;border-radius:8px;background:var(--fill);padding:6px 8px;font-size:var(--fs-foot)}
-.wrow input:focus-visible{box-shadow:var(--focus)}
+.wrow select{flex:1}
+.wrow input{order:5;flex:1 1 100%;min-width:0;height:40px;border:1px solid var(--sep);border-radius:10px;background:var(--bg,#fff);padding:8px 12px;font-size:15px;color:var(--text)}
+.wrow input::placeholder{color:var(--text3)}
+.wrow input:focus,.wrow input:focus-visible{outline:0;border-color:var(--accent,#0a84ff);box-shadow:var(--focus)}
 .wrow small{font-size:var(--fs-cap);color:var(--text3);min-width:34px;text-align:right}
 .wrow .icon-btn{width:30px;height:30px}
 .wrow .wdel:hover{color:var(--danger)}
@@ -272,7 +274,7 @@ kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;backgr
   .status-row{order:3}
   .wpts{order:4}
   .wrows{max-height:30vh}
-  .wrow input{font-size:16px}
+  .wrow input{font-size:16px;height:44px}
   .wrow select{font-size:16px}
   #panel{margin-top:8px;border-top:1px solid var(--sep);padding-top:4px}
   .p-head{min-height:36px;gap:8px}

@@ -557,7 +557,7 @@ function renderW() {
     wpts.map((w, i) => `<div class="wrow" data-i="${i}">` +
       `<span class="wdot" style="background:${wType(w.type).color}">${icon(wType(w.type).icon)}</span>` +
       `<select aria-label="Waypoint type">${Object.entries(WTYPES).map(([k, v]) => `<option value="${k}"${k === w.type ? " selected" : ""}>${v.name}</option>`).join("")}</select>` +
-      `<input value="${esc(w.name)}" maxlength="40" aria-label="Waypoint name">` +
+      `<input value="${esc(w.name)}" maxlength="40" placeholder="Name this waypoint" aria-label="Waypoint name">` +
       `<small>${w.ele != null ? Math.round(w.ele) + " m" : ""}</small>` +
       `<button class="icon-btn wgo" aria-label="Zoom to waypoint">${icon("i-target")}</button>` +
       `<button class="icon-btn wdel" aria-label="Delete waypoint">${icon("i-trash")}</button></div>`).join("") + `</div>`;
