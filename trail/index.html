@@ -60,6 +60,7 @@
   <symbol id="i-north" viewBox="0 0 24 24"><path d="M12 3.5 17.5 20 12 16.5 6.5 20z"/></symbol>
   <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
   <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8.5 5.5v13M15.5 5.5v13"/></symbol>
+  <symbol id="i-user" viewBox="0 0 24 24"><circle cx="12" cy="8.5" r="3.75"/><path d="M4.5 20c.9-3.9 3.9-6 7.5-6s6.6 2.1 7.5 6"/></symbol>
   <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9"/></symbol>
  </defs>
 </svg>
@@ -105,7 +106,9 @@
   <button id="libFolder" class="btn iconly" aria-label="New folder" data-tip="New folder"><svg class="ic"><use href="#i-folderplus"/></svg></button>
   <button id="libNew" class="btn primary"><svg class="ic"><use href="#i-plus"/></svg><span>New route</span></button></div>
  <ul id="libList" class="lib-list"></ul>
- <p class="lib-f">Saved on this device · changes save automatically</p>
+ <div class="lib-bk"><button id="libExport" class="btn"><svg class="ic"><use href="#i-export"/></svg><span>Export all</span></button><button id="libImport" class="btn"><svg class="ic"><use href="#i-import"/></svg><span>Import backup</span></button><input type="file" id="bakFile" accept=".json,application/json" hidden></div>
+ <div id="acctRow" class="acct-row" hidden><button id="acctBtn" class="btn acct"><svg class="ic"><use href="#i-user"/></svg><span id="acctTxt">Sign in to sync</span></button><span id="syncSt" class="sync-st" aria-live="polite"></span></div>
+ <p class="lib-f" id="libFoot">Saved on this device · changes save automatically</p>
 </aside>
 <div id="ui">
  <!-- Sidebar (desktop) / top of bottom sheet (phone) -->
@@ -196,6 +199,21 @@
 <dialog id="moveDlg" class="savedlg" aria-labelledby="moveTitle">
  <form method="dialog"><h2 id="moveTitle">Move to folder</h2><ul id="moveList" class="mlist"></ul><div class="sd-btns"><button class="btn">Cancel</button></div></form>
 </dialog>
+<dialog id="bakDlg" class="savedlg" aria-labelledby="bakTitle">
+ <form method="dialog"><h2 id="bakTitle">Import backup</h2><p class="sd-sub" id="bakInfo"></p>
+  <p class="sd-sub"><b>Merge</b> adds the backup's routes and keeps the newer copy of any route in both. <b>Restore</b> replaces everything with the backup.</p>
+  <div class="sd-btns"><button class="btn" value="cancel">Cancel</button><button class="btn" value="replace">Restore</button><button class="btn primary" value="merge">Merge</button></div></form>
+</dialog>
+<dialog id="acctDlg" class="savedlg" aria-labelledby="acctTitle">
+ <form id="acctForm" method="dialog"><h2 id="acctTitle">Sync your routes</h2>
+  <div id="acctOut"><p class="sd-sub">Sign in to keep your saved routes and folders in sync across devices. We'll email you a sign-in link – no password.</p>
+   <input id="acctEmail" type="email" autocomplete="email" placeholder="you@example.com" aria-label="Email">
+   <div class="sd-btns"><button type="button" class="btn" id="acctCancel">Cancel</button><button type="submit" class="btn primary" id="acctSend">Email me a link</button></div>
+   <button type="button" class="btn gbtn" id="acctGoogle" hidden>Continue with Google</button></div>
+  <div id="acctIn" hidden><p class="sd-sub">Signed in as <b id="acctMail"></b></p><p class="sd-sub" id="acctSync"></p>
+   <div class="sd-btns"><button type="button" class="btn" id="acctOutBtn">Sign out</button><button type="button" class="btn" id="acctNow">Sync now</button><button type="button" class="btn primary" id="acctDone">Done</button></div></div>
+ </form>
+</dialog>
 <dialog id="help" aria-labelledby="helpTitle">
  <form method="dialog">
   <header><h2 id="helpTitle">Keyboard shortcuts</h2><button class="icon-btn" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></header>
@@ -227,7 +245,9 @@
 </dialog>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="config.js"></script>
 <script src="app.js"></script>
+<script src="sync.js"></script>
 <script>if("serviceWorker" in navigator)navigator.serviceWorker.register("sw.js");</script>
 </body>
 </html>

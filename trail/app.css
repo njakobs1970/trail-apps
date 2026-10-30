@@ -445,3 +445,18 @@ body.v3d .ctl3d{display:flex}
 .ctl3d .ctl{touch-action:none;user-select:none;-webkit-user-select:none}
 body.v3d #map3d .maplibregl-ctrl-bottom-right{display:none}
 @media (max-width:899px){.mapctl .ctl{width:44px;height:44px}}
+
+/* 15. Backup & sync ------------------------------------------------------------- */
+.lib-bk{display:flex;gap:8px}.lib-bk .btn{flex:1;white-space:nowrap}
+.acct-row{display:flex;align-items:center;gap:8px}
+.acct-row .acct{flex:1;min-width:0;justify-content:flex-start}
+.acct-row .acct span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sync-st{font-size:var(--fs-cap);color:var(--text3);white-space:nowrap;display:inline-flex;align-items:center;gap:5px}
+.sync-st::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor}
+.sync-st.ok{color:#1f9d55}.sync-st.busy{color:var(--accent)}.sync-st.off{color:var(--text3)}.sync-st.err{color:var(--danger)}
+.sync-st:empty{display:none}
+#acctEmail{height:40px;border:0;border-radius:10px;background:var(--fill);padding:0 12px;font-size:16px;outline:none}
+#acctEmail:focus{box-shadow:var(--focus)}
+#acctOut,#acctIn{display:flex;flex-direction:column;gap:10px}
+.gbtn{min-height:40px}
+@media (max-width:899px){.lib-bk .btn,.acct-row .btn{min-height:44px}}

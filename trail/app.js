@@ -1136,7 +1136,9 @@ try { const j = JSON.parse(store.get(LIB) || "[]"); if (Array.isArray(j)) lib = 
 lib.forEach(r => { if (r.folder === undefined || (r.folder && !folders.some(f => f.id === r.folder))) r.folder = null });
 let curFolder = null, curId = store.get(CUR) || null, curSrc = "created", curName = "", libT = 0, libQ = "";
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const libPut = () => { try { localStorage.setItem(LIB, JSON.stringify({ v: 2, routes: lib, folders })); return true } catch (e) { toast("Storage full – delete some saved routes"); return false } };
+let tombs = { routes: {}, folders: {} }; try { const t = JSON.parse(store.get("tp-tomb") || "null"); if (t && t.routes) tombs = t } catch (e) { }
+const tomb = (k, id) => { tombs[k][id] = Date.now(); store.set("tp-tomb", JSON.stringify(tombs)) };
+const libPut = (quiet) => { try { localStorage.setItem(LIB, JSON.stringify({ v: 2, routes: lib, folders })); if (!quiet && window.TPSync) TPSync.changed(); return true } catch (e) { toast("Storage full – delete some saved routes"); return false } };
 function defName() { const d = new Date(); return "Route · " + d.toLocaleDateString(undefined, { day: "numeric", month: "short" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) }
 function routeThumb(pts) {
   if (pts.length < 2) return "";
@@ -1150,11 +1152,12 @@ function libSave() {
   clearTimeout(libT);
   if (!anchors.length && !wpts.length) return;                 // nothing drawn yet: don't create empty entries
   const pts = trackPts(); let dist = 0; pts.forEach((p, i) => { if (i) dist += hav(pts[i - 1], p) });
-  const now = Date.now();
+  const now = Date.now(), js = JSON.stringify({ anchors, segs, wpts });
   let m = lib.find(r => r.id === curId);
+  if (m && localStorage.getItem(RKEY(m.id)) === js) { setSaved(true); return }   // unchanged: keep its updated time (sync newest-wins)
   if (!m) { curId = newId(); m = { id: curId, name: curName || defName(), src: curSrc, created: now, folder: curFolder }; lib.unshift(m); store.set(CUR, curId) }
   Object.assign(m, { updated: now, dist, asc: Math.round(climbSeries(pts).total), n: anchors.length, w: wpts.length, thumb: routeThumb(pts) });
-  try { localStorage.setItem(RKEY(m.id), JSON.stringify({ anchors, segs, wpts })) } catch (e) { toast("Storage full – delete some saved routes") }
+  try { localStorage.setItem(RKEY(m.id), js) } catch (e) { toast("Storage full – delete some saved routes") }
   libPut(); renderLib(); setSaved(true);
 }
 function libSaveSoon() { clearTimeout(libT); setSaved(false); libT = setTimeout(libSave, 400) }
@@ -1171,8 +1174,8 @@ function doSave(copy) {
   const n = $("saveName").value.trim().slice(0, 80); if (!n) { $("saveName").focus(); return }
   if (copy) { curId = null; curSrc = "created" }
   const fs = $("saveFolder").value; curFolder = fs === "__new" ? newFolder() : fs || null;
-  curName = n; const m0 = lib.find(r => r.id === curId); if (m0) { m0.name = n; m0.folder = curFolder }
-  libSave(); $("saveDlg").close(); toast(`Saved “${n}”${copy ? " as a copy" : ""}`);
+  curName = n; const m0 = lib.find(r => r.id === curId); if (m0) { m0.name = n; m0.folder = curFolder; m0.updated = Date.now() }
+  libSave(); libPut(); renderLib(); $("saveDlg").close(); toast(`Saved “${n}”${copy ? " as a copy" : ""}`);
 }
 function resetRoute() {
   anchors = []; segs = []; markers.forEach(m => map.removeLayer(m)); markers = []; while (wpts.length) delWpt(0); setScrub(null);
@@ -1195,7 +1198,7 @@ function newRoute() {
 function renameRoute(id) {
   const m = lib.find(r => r.id === id); if (!m) return;
   const n = prompt("Rename route", m.name); if (n == null || !n.trim()) return;
-  m.name = n.trim().slice(0, 80); if (id === curId) curName = m.name; libPut(); renderLib();
+  m.name = n.trim().slice(0, 80); m.updated = Date.now(); if (id === curId) curName = m.name; libPut(); renderLib();
 }
 function dupRoute(id) {
   libSave(); const m = lib.find(r => r.id === id); if (!m) return; const d = localStorage.getItem(RKEY(id)); if (!d) return;
@@ -1205,7 +1208,7 @@ function dupRoute(id) {
 }
 function delRoute(id) {
   const m = lib.find(r => r.id === id); if (!m || !confirm(`Delete “${m.name}”? This can’t be undone.`)) return;
-  lib = lib.filter(r => r !== m); localStorage.removeItem(RKEY(id)); libPut();
+  lib = lib.filter(r => r !== m); localStorage.removeItem(RKEY(id)); tomb("routes", id); libPut();
   if (id === curId) { resetRoute(); curId = null; curName = ""; curSrc = "created"; store.set(CUR, ""); store.set(KEY.route, JSON.stringify({ anchors, segs, wpts })); render(); renderW(); updHint() }
   renderLib(); toast("Deleted " + m.name);
 }
@@ -1216,16 +1219,16 @@ function fillFolderSel(sel, v) {
 }
 function newFolder() {
   const n = prompt("New folder name", ""); if (n == null || !n.trim()) return null;
-  const f = { id: "f" + newId(), name: n.trim().slice(0, 60), open: true }; folders.push(f); libPut(); renderLib(); return f.id;
+  const f = { id: "f" + newId(), name: n.trim().slice(0, 60), open: true, updated: Date.now() }; folders.push(f); libPut(); renderLib(); return f.id;
 }
-function renameFolder(id) { const f = folders.find(x => x.id === id); if (!f) return; const n = prompt("Rename folder", f.name); if (n == null || !n.trim()) return; f.name = n.trim().slice(0, 60); libPut(); renderLib() }
+function renameFolder(id) { const f = folders.find(x => x.id === id); if (!f) return; const n = prompt("Rename folder", f.name); if (n == null || !n.trim()) return; f.name = n.trim().slice(0, 60); f.updated = Date.now(); libPut(); renderLib() }
 function delFolder(id) {
   const f = folders.find(x => x.id === id); if (!f) return; const k = lib.filter(r => r.folder === id).length;
   if (!confirm(`Delete folder “${f.name}”?${k ? ` Its ${k} route${k > 1 ? "s" : ""} will move to Unfiled.` : ""}`)) return;
-  lib.forEach(r => { if (r.folder === id) r.folder = null }); if (curFolder === id) curFolder = null;
-  folders = folders.filter(x => x !== f); libPut(); renderLib(); toast("Deleted folder " + f.name);
+  lib.forEach(r => { if (r.folder === id) { r.folder = null; r.updated = Date.now() } }); if (curFolder === id) curFolder = null;
+  folders = folders.filter(x => x !== f); tomb("folders", id); libPut(); renderLib(); toast("Deleted folder " + f.name);
 }
-function moveRoute(id, fid) { const m = lib.find(r => r.id === id); if (!m) return; m.folder = fid || null; if (id === curId) curFolder = m.folder; libPut(); renderLib(); toast(`Moved to ${fid ? folders.find(f => f.id === fid).name : "Unfiled"}`) }
+function moveRoute(id, fid) { const m = lib.find(r => r.id === id); if (!m) return; m.folder = fid || null; m.updated = Date.now(); if (id === curId) curFolder = m.folder; libPut(); renderLib(); toast(`Moved to ${fid ? folders.find(f => f.id === fid).name : "Unfiled"}`) }
 function moveDialog(id) {
   const m = lib.find(r => r.id === id); if (!m) return; const d = $("moveDlg");
   $("moveTitle").textContent = `Move “${m.name}”`;
@@ -1268,6 +1271,95 @@ $("saveBtn").onclick = $("saveBtn2").onclick = saveDialog;
 $("saveForm").onsubmit = e => { e.preventDefault(); doSave(e.submitter && e.submitter.id === "saveCopy") };
 $("saveCancel").onclick = () => $("saveDlg").close(); $("libClose").onclick = () => openLib(false); $("libBtn").onclick = () => openLib();
 L.DomEvent.disableClickPropagation($("lib")); L.DomEvent.disableScrollPropagation($("lib"));
+
+/* 12c. Library data API (backup + sync) -----------------------------------------
+ * items: {id, kind:"route"|"folder", updated (ms), deleted, meta, data}. Used by backup and sync.js. */
+const TPLib = {
+  items() {
+    const r = lib.map(m => { let d = null; try { d = JSON.parse(localStorage.getItem(RKEY(m.id)) || "null") } catch (e) { } return { id: m.id, kind: "route", updated: m.updated || m.created || 0, deleted: false, meta: m, data: d } });
+    const f = folders.map(x => ({ id: x.id, kind: "folder", updated: x.updated || 0, deleted: false, meta: x }));
+    const t = [...Object.entries(tombs.routes).map(([id, u]) => ({ id, kind: "route", updated: u, deleted: true })), ...Object.entries(tombs.folders).map(([id, u]) => ({ id, kind: "folder", updated: u, deleted: true }))];
+    return [...r, ...f, ...t];
+  },
+  /** Write items into local storage (each already decided to win). Returns true if the open route changed. */
+  apply(items, quiet = true) {
+    let curChanged = false;
+    for (const it of items) {
+      const K = it.kind === "folder" ? "folders" : "routes";
+      if (it.deleted) {
+        if (K === "routes") { lib = lib.filter(r => r.id !== it.id); localStorage.removeItem(RKEY(it.id)); if (it.id === curId) curChanged = true }
+        else { folders = folders.filter(f => f.id !== it.id); lib.forEach(r => { if (r.folder === it.id) r.folder = null }) }
+        tombs[K][it.id] = it.updated; continue;
+      }
+      delete tombs[K][it.id];
+      if (K === "folders") { const i = folders.findIndex(f => f.id === it.id), v = { ...it.meta, id: it.id, updated: it.updated }; if (i < 0) folders.push(v); else folders[i] = v; continue }
+      if (!it.data) continue;
+      try { localStorage.setItem(RKEY(it.id), JSON.stringify(it.data)) } catch (e) { toast("Storage full – delete some saved routes"); break }
+      const i = lib.findIndex(r => r.id === it.id), v = { ...it.meta, id: it.id, updated: it.updated };
+      if (i < 0) lib.push(v); else lib[i] = v; if (it.id === curId) curChanged = true;
+    }
+    lib.forEach(r => { if (r.folder && !folders.some(f => f.id === r.folder)) r.folder = null });
+    lib.sort((a, b) => (b.updated || 0) - (a.updated || 0));
+    store.set("tp-tomb", JSON.stringify(tombs)); libPut(quiet); renderLib();
+    if (curChanged) { const m = lib.find(r => r.id === curId); if (m) reloadCur(); else { resetRoute(); curId = null; store.set(CUR, ""); render(); renderW(); updHint() } }
+    return curChanged;
+  },
+  clearAll() { lib.forEach(r => localStorage.removeItem(RKEY(r.id))); lib = []; folders = []; tombs = { routes: {}, folders: {} } },
+  curId: () => curId,
+};
+/** Newest-wins merge of two item lists. Returns what each side must take. Pure (unit-tested). */
+function mergeItems(local, remote) {
+  const key = it => it.kind + ":" + it.id, L = new Map(local.map(x => [key(x), x])), R = new Map(remote.map(x => [key(x), x]));
+  const toLocal = [], toRemote = [];
+  for (const [k, l] of L) { const r = R.get(k); if (!r || l.updated > r.updated) toRemote.push(l); else if (r.updated > l.updated) toLocal.push(r) }
+  for (const [k, r] of R) if (!L.has(k) && !r.deleted) toLocal.push(r); else if (!L.has(k) && r.deleted) toLocal.push(r);
+  return { toLocal, toRemote };
+}
+function reloadCur() {
+  const m = lib.find(r => r.id === curId); if (!m) return; let d = null; try { d = JSON.parse(localStorage.getItem(RKEY(curId)) || "null") } catch (e) { } if (!d) return;
+  clearTimeout(libT); resetRoute(); curName = m.name; curFolder = m.folder || null; load(d); render(); renderW(); updHint(); store.set(KEY.route, JSON.stringify({ anchors, segs, wpts }));
+}
+// Backup: one JSON file with every route, folder and the format version
+const BACKUP_VER = 1;
+function exportBackup() {
+  libSave(); const it = TPLib.items().filter(x => !x.deleted);
+  const b = { app: "trail-planner", type: "saved-routes-backup", version: BACKUP_VER, exported: new Date().toISOString(),
+    folders: it.filter(x => x.kind === "folder").map(x => x.meta), routes: it.filter(x => x.kind === "route").map(x => ({ ...x.meta, updatedAt: x.updated, data: x.data })) };
+  const blob = new Blob([JSON.stringify(b)], { type: "application/json" }), a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = `trail-planner-backup-${new Date(Date.now() - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10)}.json`; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  toast(`Exported ${b.routes.length} route${b.routes.length === 1 ? "" : "s"} and ${b.folders.length} folder${b.folders.length === 1 ? "" : "s"}`);
+  return b;
+}
+function parseBackup(text) {
+  const b = JSON.parse(text);
+  if (!b || b.app !== "trail-planner" || !Array.isArray(b.routes)) throw new Error("Not a Trail Planner backup");
+  if (b.version > BACKUP_VER) throw new Error("Backup is from a newer version");
+  const f = (b.folders || []).filter(x => x && x.id).map(x => ({ id: x.id, kind: "folder", updated: x.updated || 0, deleted: false, meta: x }));
+  const r = b.routes.filter(x => x && x.id && x.data && Array.isArray(x.data.anchors)).map(x => { const { data, updatedAt, ...meta } = x; return { id: x.id, kind: "route", updated: updatedAt || x.updated || 0, deleted: false, meta, data } });
+  return [...f, ...r];
+}
+/** mode "merge": add/replace by id, newest wins. "replace": wipe the library, then restore the backup. */
+function importBackup(text, mode = "merge") {
+  const items = parseBackup(text); libSave();
+  if (mode === "replace") {
+    const old = TPLib.items().filter(x => !x.deleted); TPLib.clearAll();
+    const keep = new Set(items.map(x => x.kind + ":" + x.id)); old.forEach(x => { if (!keep.has(x.kind + ":" + x.id)) tombs[x.kind === "folder" ? "folders" : "routes"][x.id] = Date.now() });   // so sync removes them too
+    TPLib.apply(items, false);
+  } else {
+    const { toLocal } = mergeItems(TPLib.items(), items); TPLib.apply(toLocal.filter(x => !x.deleted), false);
+  }
+  const n = items.filter(x => x.kind === "route").length; toast(`${mode === "replace" ? "Restored" : "Merged"} backup: ${n} route${n === 1 ? "" : "s"}`); return n;
+}
+$("libExport").onclick = exportBackup;
+$("libImport").onclick = () => $("bakFile").click();
+$("bakFile").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return; let t;
+  try { t = await f.text(); const it = parseBackup(t); $("bakInfo").textContent = `${f.name}: ${it.filter(x => x.kind === "route").length} routes, ${it.filter(x => x.kind === "folder").length} folders.`; } catch (err) { return toast("Could not read backup: " + err.message, 5000) }
+  const d = $("bakDlg"); d.showModal();
+  d.onclose = () => { if (d.returnValue === "merge" || d.returnValue === "replace") { if (d.returnValue === "replace" && !confirm("Replace ALL saved routes and folders on this device with the backup?")) return; try { importBackup(t, d.returnValue) } catch (err) { toast("Import failed: " + err.message, 5000) } } };
+};
+if (navigator.storage && navigator.storage.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist()).catch(() => { });
+window.TPLib = TPLib; window.TPLib.merge = mergeItems; window.TPLib.importBackup = importBackup; window.TPLib.exportBackup = exportBackup;
 // migrate: a route saved before the library existed becomes the first library entry
 (() => {
   if (curId && lib.some(r => r.id === curId)) { curFolder = lib.find(r => r.id === curId).folder; curName = lib.find(r => r.id === curId).name; curSrc = lib.find(r => r.id === curId).src; return }
