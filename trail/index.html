@@ -50,6 +50,9 @@
   <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M15.5 5.5l3 3L8.5 18.5l-4 1 1-4z"/></symbol>
   <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2"/><path d="M15.5 8.5V6.5a2 2 0 0 0-2-2h-7a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></symbol>
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6"/><path d="m15 15 5 5"/></symbol>
+  <symbol id="i-save" viewBox="0 0 24 24"><path d="M5.5 3.5h10l3 3v12a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M8 3.5v5h7v-5M8 20.5v-6h8v6"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
+  <symbol id="i-folderplus" viewBox="0 0 24 24"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2.2h7a2 2 0 0 1 2 2v8.3a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 11v6M9 14h6"/></symbol>
   <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9"/></symbol>
  </defs>
 </svg>
@@ -80,6 +83,7 @@
 <aside id="lib" class="lib" aria-label="Saved routes" aria-hidden="true">
  <header class="lib-h"><h2>Saved routes</h2><span id="libCount" class="lib-c"></span><button id="libClose" class="icon-btn" aria-label="Close saved routes" data-tip="Close  Esc"><svg class="ic"><use href="#i-close"/></svg></button></header>
  <div class="lib-tools"><label class="lib-q"><svg class="ic"><use href="#i-search"/></svg><input id="libQ" type="search" placeholder="Search routes" aria-label="Search saved routes" autocomplete="off"></label>
+  <button id="libFolder" class="btn iconly" aria-label="New folder" data-tip="New folder"><svg class="ic"><use href="#i-folderplus"/></svg></button>
   <button id="libNew" class="btn primary"><svg class="ic"><use href="#i-plus"/></svg><span>New route</span></button></div>
  <ul id="libList" class="lib-list"></ul>
  <p class="lib-f">Saved on this device · changes save automatically</p>
@@ -90,6 +94,7 @@
   <header class="brand">
    <img src="icons/favicon.svg" alt="" width="28" height="28">
    <div class="brand-t"><h1>Trail Planner</h1><p>Plan · Profile · Export GPX</p></div>
+   <button id="saveBtn2" class="icon-btn savebtn" aria-label="Save route" data-tip="Save  ⌘S"><svg class="ic"><use href="#i-save"/></svg></button>
    <button id="libBtn2" class="icon-btn" aria-label="Saved routes" data-tip="Saved routes  O" onclick="openLib()"><svg class="ic"><use href="#i-folder"/></svg></button>
    <button id="helpBtn" class="icon-btn" aria-label="Keyboard shortcuts" data-tip="Shortcuts  ?"><svg class="ic"><use href="#i-keyboard"/></svg></button>
   </header>
@@ -112,6 +117,7 @@
 
   <div class="actions">
    <button id="libBtn" class="btn" aria-label="Saved routes" aria-expanded="false" aria-controls="lib" data-tip="Saved routes  O"><svg class="ic"><use href="#i-folder"/></svg><span>Routes</span></button>
+   <button id="saveBtn" class="btn savebtn" aria-label="Save route" data-tip="Save  ⌘S"><svg class="ic"><use href="#i-save"/></svg><span>Save</span></button>
    <button id="undo" class="btn" aria-label="Undo last point" data-tip="Undo  ⌘Z / Ctrl+Z"><svg class="ic"><use href="#i-undo"/></svg><span>Undo</span></button>
    <button id="ret" class="btn" aria-label="Add return path" data-tip="Return to start  R"><svg class="ic"><use href="#i-return"/></svg><span>Return</span></button>
    <button id="clear" class="btn" aria-label="Clear route" data-tip="Clear route"><svg class="ic"><use href="#i-trash"/></svg><span>Clear</span></button>
@@ -159,6 +165,18 @@
  </section>
 </div>
 
+<dialog id="saveDlg" class="savedlg" aria-labelledby="saveTitle">
+ <form id="saveForm" method="dialog">
+  <h2 id="saveTitle">Save route</h2>
+  <p class="sd-sub">Saved to <b>Saved routes</b> on this device.</p>
+  <input id="saveName" maxlength="80" autocomplete="off" aria-label="Route name" placeholder="Route name">
+  <label class="sd-f"><span>Folder</span><select id="saveFolder" aria-label="Folder"></select></label>
+  <div class="sd-btns"><button type="button" id="saveCancel" class="btn">Cancel</button><button type="submit" id="saveCopy" class="btn">Save as copy</button><button type="submit" id="saveOk" class="btn primary">Save</button></div>
+ </form>
+</dialog>
+<dialog id="moveDlg" class="savedlg" aria-labelledby="moveTitle">
+ <form method="dialog"><h2 id="moveTitle">Move to folder</h2><ul id="moveList" class="mlist"></ul><div class="sd-btns"><button class="btn">Cancel</button></div></form>
+</dialog>
 <dialog id="help" aria-labelledby="helpTitle">
  <form method="dialog">
   <header><h2 id="helpTitle">Keyboard shortcuts</h2><button class="icon-btn" aria-label="Close"><svg class="ic"><use href="#i-close"/></svg></button></header>
@@ -168,6 +186,7 @@
    <dt><kbd>W</kbd></dt><dd>Waypoint mode</dd>
    <dt><kbd>⌘</kbd><kbd>Z</kbd> / <kbd>Ctrl</kbd><kbd>Z</kbd></dt><dd>Undo last point</dd>
    <dt><kbd>O</kbd></dt><dd>Saved routes</dd>
+   <dt><kbd>⌘</kbd><kbd>S</kbd> / <kbd>Ctrl</kbd><kbd>S</kbd></dt><dd>Save route</dd>
    <dt><kbd>R</kbd></dt><dd>Add return path</dd>
    <dt><kbd>E</kbd></dt><dd>Export GPX</dd>
    <dt><kbd>I</kbd></dt><dd>Import GPX</dd>

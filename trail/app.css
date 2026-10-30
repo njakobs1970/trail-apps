@@ -375,3 +375,47 @@ body.libopen .lib{transform:none;visibility:visible;transition:transform 320ms c
 .lib-q input::-webkit-search-cancel-button{opacity:.6}
 .lib-q{min-width:0}.lib-tools{min-width:0}
 body.libopen .hint{display:none!important}
+
+/* 12. Save sheet ---------------------------------------------------------------- */
+.savebtn{position:relative}
+.savebtn.dirty::after{content:"";position:absolute;top:5px;right:5px;width:7px;height:7px;border-radius:50%;background:var(--warn);box-shadow:0 0 0 2px var(--glass)}
+#saveBtn.dirty::after{top:4px;right:6px}
+#saveBtn2:disabled{opacity:.4;cursor:default}
+.savedlg{width:min(360px,calc(100% - 32px))}
+.savedlg form{display:flex;flex-direction:column;gap:10px;padding:20px}
+.savedlg h2{font-size:var(--fs-head);font-weight:650;text-align:center}
+.sd-sub{font-size:var(--fs-cap);color:var(--text2);text-align:center}
+#saveName{height:40px;border:0;border-radius:10px;background:var(--fill);padding:0 12px;font-size:16px;outline:none}
+#saveName:focus{box-shadow:var(--focus)}
+.sd-btns{display:flex;gap:8px;margin-top:4px}.sd-btns .btn{flex:1;min-height:40px}
+.savedlg::backdrop{background:rgba(0,0,0,.25)}
+@media (min-width:900px){#saveBtn{display:none}}
+@media (max-width:899px){#saveBtn2{display:none}}
+
+/* 13. Folders ------------------------------------------------------------------- */
+.lfold{list-style:none}
+.lfold+.lfold,.lfold+.lrow{border-top:1px solid var(--sep)}
+.lf-h{display:flex;align-items:center;background:var(--fill);position:sticky;top:0;z-index:1}
+.lf-t{flex:1;min-width:0;display:flex;align-items:center;gap:8px;height:40px;padding:0 6px 0 10px;border:0;background:transparent;font-weight:600;font-size:var(--fs-foot);text-align:left}
+.lf-t .ic{width:17px;height:17px;color:var(--accent)}
+.lf-t .chev{color:var(--text3);transition:transform var(--t) var(--ease)}
+.lfold.shut .chev{transform:rotate(-90deg)}
+.lfold.shut .lf-b{display:none}
+.lf-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lf-c{font-weight:500;color:var(--text3);font-size:var(--fs-cap);min-width:20px;text-align:right}
+.lf-h .lacts{opacity:.5}.lf-h:hover .lacts{opacity:1}
+.lf-b{list-style:none;margin:0;padding:0}
+.lf-b .lempty{padding:14px 16px}
+.lf-b .lrow:first-child::before{content:none}
+.btn.iconly{width:36px;padding:0;flex:none}
+.sd-f{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:var(--fs-foot);color:var(--text2)}
+.sd-f select{flex:1;max-width:220px;height:36px}
+.mlist{list-style:none;margin:0;padding:0;border-radius:var(--r);background:var(--fill);overflow:hidden;max-height:50vh;overflow-y:auto}
+.mlist li+li{border-top:1px solid var(--sep)}
+.mlist button{width:100%;display:flex;align-items:center;gap:10px;height:44px;padding:0 12px;border:0;background:transparent;text-align:left;font-size:var(--fs-body)}
+.mlist button:hover{background:var(--fill-h)}
+.mlist button span{flex:1}.mlist .ic{color:var(--accent);width:18px;height:18px}
+.mlist button.on{font-weight:600}.mlist .mnew{color:var(--accent)}
+@media (max-width:899px){.btn.iconly{width:44px}.lf-t{height:46px}.lf-h .lacts{opacity:1}}
+@media (min-width:900px) and (hover:hover){.lrow .lacts{display:none}.lrow:hover .lacts,.lrow:focus-within .lacts{display:flex}}
+.sd-btns .btn{white-space:nowrap;padding:0 10px}

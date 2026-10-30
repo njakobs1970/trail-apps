@@ -570,7 +570,7 @@ function render() {
   $("eMin").innerHTML = isFinite(lo) ? `${Math.round(lo)} <small>m</small>` : "–";
   $("eMax").innerHTML = isFinite(hi) ? `${Math.round(hi)} <small>m</small>` : "–";
   $("eTime").textContent = dist > 0 ? fmtDur(naismith(dist, cs.total, pace)) : "–";
-  $("exp").disabled = pts.length < 2; $("undo").disabled = !anchors.length; $("ret").disabled = anchors.length < 2;
+  $("exp").disabled = pts.length < 2; $("undo").disabled = !anchors.length; $("ret").disabled = anchors.length < 2; $("saveBtn").disabled = $("saveBtn2").disabled = !anchors.length && !wpts.length;
   drawProfile(prof); renderCues();
 }
 let renderQueued = false;
@@ -864,7 +864,7 @@ async function importGpx(text) {
   const g = parseGpx(text); if (g.pts.length < 2 && !g.wpts.length) return toast("No track, route or waypoints found in that GPX");
   libSave();                                               // the current route stays in Saved routes
   anchors = []; segs = []; markers.forEach(m => map.removeLayer(m)); markers = []; while (wpts.length) delWpt(0);
-  curId = null; curSrc = "imported"; curName = (g.name || "").trim() || "Imported route";
+  curId = null; curFolder = null; curSrc = "imported"; curName = (g.name || "").trim() || "Imported route";
   let fresh = [];
   if (g.pts.length >= 2) {
     const pts = g.pts.filter((p, i) => !i || hav(g.pts[i - 1], p) > .5);
@@ -961,9 +961,11 @@ function updHint() {
 }
 // keyboard shortcuts (ignored while typing in a field)
 addEventListener("keydown", e => {
-  if (/^(input|select|textarea)$/i.test(e.target.tagName || "")) return;
+  if (/^(input|select|textarea)$/i.test(e.target.tagName || "") && !((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s")) return;
+  if ($("saveDlg").open) { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") e.preventDefault(); return }
   if ($("help").open) return;
   const mod = e.metaKey || e.ctrlKey;
+  if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); if (!$("saveDlg").open) saveDialog(); return }
   if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return }
   if (!mod && !e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); openLib(); return }
   if (!mod && e.key.toLowerCase() === "r") { e.preventDefault(); returnPath(); return }
@@ -1020,10 +1022,13 @@ function load(s) {
  *               tp-r:<id> = {anchors, segs, wpts} (one key per route, so the index stays small)
  *               tp-cur = id of the route being edited. Any change auto-saves into it. */
 const LIB = "tp-lib", CUR = "tp-cur", RKEY = id => "tp-r:" + id;
-let lib = []; try { lib = JSON.parse(store.get(LIB) || "[]"); if (!Array.isArray(lib)) lib = [] } catch (e) { lib = [] }
-let curId = store.get(CUR) || null, curSrc = "created", curName = "", libT = 0, libQ = "";
+// tp-lib = {v:2, routes:[…], folders:[{id,name,open}]}; v1 was a bare routes array (all routes become Unfiled)
+let lib = [], folders = [];
+try { const j = JSON.parse(store.get(LIB) || "[]"); if (Array.isArray(j)) lib = j; else if (j && Array.isArray(j.routes)) { lib = j.routes; folders = Array.isArray(j.folders) ? j.folders : [] } } catch (e) { lib = [] }
+lib.forEach(r => { if (r.folder === undefined || (r.folder && !folders.some(f => f.id === r.folder))) r.folder = null });
+let curFolder = null, curId = store.get(CUR) || null, curSrc = "created", curName = "", libT = 0, libQ = "";
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-const libPut = () => { try { localStorage.setItem(LIB, JSON.stringify(lib)); return true } catch (e) { toast("Storage full – delete some saved routes"); return false } };
+const libPut = () => { try { localStorage.setItem(LIB, JSON.stringify({ v: 2, routes: lib, folders })); return true } catch (e) { toast("Storage full – delete some saved routes"); return false } };
 function defName() { const d = new Date(); return "Route · " + d.toLocaleDateString(undefined, { day: "numeric", month: "short" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) }
 function routeThumb(pts) {
   if (pts.length < 2) return "";
@@ -1039,12 +1044,28 @@ function libSave() {
   const pts = trackPts(); let dist = 0; pts.forEach((p, i) => { if (i) dist += hav(pts[i - 1], p) });
   const now = Date.now();
   let m = lib.find(r => r.id === curId);
-  if (!m) { curId = newId(); m = { id: curId, name: curName || defName(), src: curSrc, created: now }; lib.unshift(m); store.set(CUR, curId) }
+  if (!m) { curId = newId(); m = { id: curId, name: curName || defName(), src: curSrc, created: now, folder: curFolder }; lib.unshift(m); store.set(CUR, curId) }
   Object.assign(m, { updated: now, dist, asc: Math.round(climbSeries(pts).total), n: anchors.length, w: wpts.length, thumb: routeThumb(pts) });
   try { localStorage.setItem(RKEY(m.id), JSON.stringify({ anchors, segs, wpts })) } catch (e) { toast("Storage full – delete some saved routes") }
-  libPut(); renderLib();
+  libPut(); renderLib(); setSaved(true);
 }
-function libSaveSoon() { clearTimeout(libT); libT = setTimeout(libSave, 400) }
+function libSaveSoon() { clearTimeout(libT); setSaved(false); libT = setTimeout(libSave, 400) }
+function setSaved(ok) {
+  for (const id of ["saveBtn", "saveBtn2"]) { const b = $(id); if (!b) continue; b.classList.toggle("dirty", !ok); b.dataset.tip = (ok ? "Saved" : "Saving changes…") + " · Save  ⌘S" }
+}
+function saveDialog() {
+  if (!anchors.length && !wpts.length) return toast("Draw a route first");
+  libSave(); const m = lib.find(r => r.id === curId);
+  const d = $("saveDlg"), f = $("saveName"); f.value = m ? m.name : (curName || defName()); $("saveCopy").hidden = !m; fillFolderSel($("saveFolder"), m ? m.folder : curFolder);
+  d.showModal(); f.focus(); f.select();
+}
+function doSave(copy) {
+  const n = $("saveName").value.trim().slice(0, 80); if (!n) { $("saveName").focus(); return }
+  if (copy) { curId = null; curSrc = "created" }
+  const fs = $("saveFolder").value; curFolder = fs === "__new" ? newFolder() : fs || null;
+  curName = n; const m0 = lib.find(r => r.id === curId); if (m0) { m0.name = n; m0.folder = curFolder }
+  libSave(); $("saveDlg").close(); toast(`Saved “${n}”${copy ? " as a copy" : ""}`);
+}
 function resetRoute() {
   anchors = []; segs = []; markers.forEach(m => map.removeLayer(m)); markers = []; while (wpts.length) delWpt(0); setScrub(null);
 }
@@ -1053,14 +1074,14 @@ function openRoute(id) {
   const m = lib.find(r => r.id === id); if (!m) return;
   let d = null; try { d = JSON.parse(localStorage.getItem(RKEY(id)) || "null") } catch (e) { }
   if (!d) return toast("That route could not be read");
-  resetRoute(); curId = id; curSrc = m.src; curName = m.name; store.set(CUR, id);
+  resetRoute(); curId = id; curSrc = m.src; curName = m.name; curFolder = m.folder || null; store.set(CUR, id);
   load(d); render(); renderW(); updHint(); store.set(KEY.route, JSON.stringify({ anchors, segs, wpts }));
   if (segs.some(s => s.mode === "snap" && !s.fallback && s.cv !== CUE_VER)) rebuildCues(); else updJoins();
   if (allPts().some(p => p[2] == null)) backfillAll();
   renderLib(); if (!isDesktop()) openLib(false); toast("Opened " + m.name);
 }
 function newRoute() {
-  libSave(); resetRoute(); curId = null; curSrc = "created"; curName = ""; store.set(CUR, "");
+  libSave(); resetRoute(); curId = null; curSrc = "created"; curName = ""; curFolder = null; store.set(CUR, "");
   store.set(KEY.route, JSON.stringify({ anchors, segs, wpts })); render(); renderW(); updHint(); renderLib(); openLib(false); toast("New route – click the map to start");
 }
 function renameRoute(id) {
@@ -1070,7 +1091,7 @@ function renameRoute(id) {
 }
 function dupRoute(id) {
   libSave(); const m = lib.find(r => r.id === id); if (!m) return; const d = localStorage.getItem(RKEY(id)); if (!d) return;
-  const c = { ...m, id: newId(), name: m.name + " copy", created: Date.now(), updated: Date.now() };
+  const c = { ...m, folder: m.folder, id: newId(), name: m.name + " copy", created: Date.now(), updated: Date.now() };
   try { localStorage.setItem(RKEY(c.id), d) } catch (e) { return toast("Storage full – delete some saved routes") }
   lib.splice(lib.indexOf(m), 0, c); libPut(); renderLib(); toast("Duplicated " + m.name);
 }
@@ -1081,30 +1102,67 @@ function delRoute(id) {
   renderLib(); toast("Deleted " + m.name);
 }
 const fmtDate = t => { const d = new Date(t), now = new Date(); return d.toDateString() === now.toDateString() ? d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : d.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}) }) };
+function fillFolderSel(sel, v) {
+  sel.innerHTML = `<option value="">Unfiled</option>${folders.map(f => `<option value="${esc(f.id)}">${esc(f.name)}</option>`).join("")}<option value="__new">New folder…</option>`;
+  sel.value = v && folders.some(f => f.id === v) ? v : "";
+}
+function newFolder() {
+  const n = prompt("New folder name", ""); if (n == null || !n.trim()) return null;
+  const f = { id: "f" + newId(), name: n.trim().slice(0, 60), open: true }; folders.push(f); libPut(); renderLib(); return f.id;
+}
+function renameFolder(id) { const f = folders.find(x => x.id === id); if (!f) return; const n = prompt("Rename folder", f.name); if (n == null || !n.trim()) return; f.name = n.trim().slice(0, 60); libPut(); renderLib() }
+function delFolder(id) {
+  const f = folders.find(x => x.id === id); if (!f) return; const k = lib.filter(r => r.folder === id).length;
+  if (!confirm(`Delete folder “${f.name}”?${k ? ` Its ${k} route${k > 1 ? "s" : ""} will move to Unfiled.` : ""}`)) return;
+  lib.forEach(r => { if (r.folder === id) r.folder = null }); if (curFolder === id) curFolder = null;
+  folders = folders.filter(x => x !== f); libPut(); renderLib(); toast("Deleted folder " + f.name);
+}
+function moveRoute(id, fid) { const m = lib.find(r => r.id === id); if (!m) return; m.folder = fid || null; if (id === curId) curFolder = m.folder; libPut(); renderLib(); toast(`Moved to ${fid ? folders.find(f => f.id === fid).name : "Unfiled"}`) }
+function moveDialog(id) {
+  const m = lib.find(r => r.id === id); if (!m) return; const d = $("moveDlg");
+  $("moveTitle").textContent = `Move “${m.name}”`;
+  $("moveList").innerHTML = [{ id: "", name: "Unfiled" }, ...folders].map(f => `<li><button type="button" data-f="${esc(f.id)}" class="${(m.folder || "") === f.id ? "on" : ""}"><svg class="ic"><use href="#i-folder"/></svg><span>${esc(f.name)}</span>${(m.folder || "") === f.id ? '<svg class="ic ck"><use href="#i-check"/></svg>' : ""}</button></li>`).join("") +
+    `<li><button type="button" data-f="__new" class="mnew"><svg class="ic"><use href="#i-plus"/></svg><span>New folder…</span></button></li>`;
+  $("moveList").onclick = e => { const b = e.target.closest("[data-f]"); if (!b) return; let f = b.dataset.f; if (f === "__new") { f = newFolder(); if (!f) return } d.close(); moveRoute(id, f) };
+  d.showModal();
+}
 function renderLib() {
   const el = $("libList"); if (!el) return;
-  const q = libQ.trim().toLowerCase(), rows = lib.filter(r => !q || r.name.toLowerCase().includes(q));
+  const q = libQ.trim().toLowerCase(), fname = id => (folders.find(f => f.id === id) || {}).name;
   $("libCount").textContent = lib.length ? `${lib.length} route${lib.length > 1 ? "s" : ""}` : "";
-  el.innerHTML = rows.length ? rows.map(r => `<li class="lrow${r.id === curId ? " cur" : ""}" data-id="${esc(r.id)}">
+  const row = (r, showF) => `<li class="lrow${r.id === curId ? " cur" : ""}" data-id="${esc(r.id)}">
     <button class="lopen" data-act="open" aria-label="Open ${esc(r.name)}"><svg class="lthumb" viewBox="0 0 44 44" aria-hidden="true">${r.thumb ? `<polyline points="${r.thumb}"/>` : ""}</svg>
-     <span class="lmain"><span class="lname">${esc(r.name)}</span><span class="lmeta">${(r.dist / 1000 || 0).toFixed(1)} km · ↑${r.asc || 0} m · ${fmtDate(r.updated || r.created)}${r.src === "imported" ? ' · <span class="ltag">GPX</span>' : ""}</span></span></button>
-    <span class="lacts"><button class="icon-btn" data-act="ren" aria-label="Rename" data-tip="Rename"><svg class="ic"><use href="#i-pencil"/></svg></button><button class="icon-btn" data-act="dup" aria-label="Duplicate" data-tip="Duplicate"><svg class="ic"><use href="#i-copy"/></svg></button><button class="icon-btn danger" data-act="del" aria-label="Delete" data-tip="Delete"><svg class="ic"><use href="#i-trash"/></svg></button></span></li>`).join("")
-    : `<li class="lempty">${lib.length ? "No routes match" : "No saved routes yet.<br>Routes you draw or import are saved here automatically."}</li>`;
+     <span class="lmain"><span class="lname">${esc(r.name)}</span><span class="lmeta">${(r.dist / 1000 || 0).toFixed(1)} km · ↑${r.asc || 0} m · ${fmtDate(r.updated || r.created)}${r.src === "imported" ? ' · <span class="ltag">GPX</span>' : ""}${showF && r.folder ? ` · ${esc(fname(r.folder))}` : ""}</span></span></button>
+    <span class="lacts"><button class="icon-btn" data-act="mv" aria-label="Move to folder" data-tip="Move to folder"><svg class="ic"><use href="#i-folder"/></svg></button><button class="icon-btn" data-act="ren" aria-label="Rename" data-tip="Rename"><svg class="ic"><use href="#i-pencil"/></svg></button><button class="icon-btn" data-act="dup" aria-label="Duplicate" data-tip="Duplicate"><svg class="ic"><use href="#i-copy"/></svg></button><button class="icon-btn danger" data-act="del" aria-label="Delete" data-tip="Delete"><svg class="ic"><use href="#i-trash"/></svg></button></span></li>`;
+  const empty = t => `<li class="lempty">${t}</li>`;
+  if (q) { const rows = lib.filter(r => r.name.toLowerCase().includes(q) || (r.folder && fname(r.folder).toLowerCase().includes(q))); el.innerHTML = rows.length ? rows.map(r => row(r, true)).join("") : empty("No routes match"); return }
+  if (!lib.length && !folders.length) { el.innerHTML = empty("No saved routes yet.<br>Routes you draw or import are saved here automatically."); return }
+  const grp = (f, rs) => `<li class="lfold${f.open === false ? " shut" : ""}" data-fid="${esc(f.id)}"><div class="lf-h"><button class="lf-t" data-act="tog" aria-expanded="${f.open !== false}"><svg class="ic chev"><use href="#i-chevron"/></svg><svg class="ic"><use href="#i-folder"/></svg><span class="lf-n">${esc(f.name)}</span><span class="lf-c">${rs.length}</span></button>` +
+    (f.id ? `<span class="lacts"><button class="icon-btn" data-act="fren" aria-label="Rename folder" data-tip="Rename folder"><svg class="ic"><use href="#i-pencil"/></svg></button><button class="icon-btn danger" data-act="fdel" aria-label="Delete folder" data-tip="Delete folder"><svg class="ic"><use href="#i-trash"/></svg></button></span>` : "") +
+    `</div><ul class="lf-b">${rs.length ? rs.map(r => row(r)).join("") : empty("Empty folder – move routes here with the folder button")}</ul></li>`;
+  const un = lib.filter(r => !r.folder);
+  el.innerHTML = folders.map(f => grp(f, lib.filter(r => r.folder === f.id))).join("") + (folders.length ? grp({ id: "", name: "Unfiled", open: store.get("tp-unf") !== "shut" }, un) : un.map(r => row(r)).join(""));
 }
 function openLib(on = !document.body.classList.contains("libopen")) {
   document.body.classList.toggle("libopen", on); $("lib").setAttribute("aria-hidden", !on); $("libBtn").setAttribute("aria-expanded", on);
   if (on) { libSave(); renderLib(); if (isDesktop()) setTimeout(() => $("libQ").focus(), 220) }
 }
 $("libList").onclick = e => {
-  const b = e.target.closest("[data-act]"), li = e.target.closest(".lrow"); if (!b || !li) return; const id = li.dataset.id;
-  ({ open: openRoute, ren: renameRoute, dup: dupRoute, del: delRoute })[b.dataset.act](id);
+  const b = e.target.closest("[data-act]"); if (!b) return; const a = b.dataset.act, li = e.target.closest(".lrow"), fo = e.target.closest(".lfold");
+  if (li) return ({ open: openRoute, ren: renameRoute, dup: dupRoute, del: delRoute, mv: moveDialog })[a](li.dataset.id);
+  if (!fo) return; const fid = fo.dataset.fid;
+  if (a === "tog") { if (fid) { const f = folders.find(x => x.id === fid); f.open = f.open === false; libPut() } else store.set("tp-unf", store.get("tp-unf") === "shut" ? "" : "shut"); renderLib() }
+  else if (a === "fren") renameFolder(fid); else if (a === "fdel") delFolder(fid);
 };
 $("libQ").oninput = e => { libQ = e.target.value; renderLib() };
-$("libNew").onclick = newRoute; $("libClose").onclick = () => openLib(false); $("libBtn").onclick = () => openLib();
+$("libNew").onclick = newRoute; $("libFolder").onclick = () => { const f = newFolder(); if (f) toast("Folder created") };
+$("saveBtn").onclick = $("saveBtn2").onclick = saveDialog;
+$("saveForm").onsubmit = e => { e.preventDefault(); doSave(e.submitter && e.submitter.id === "saveCopy") };
+$("saveCancel").onclick = () => $("saveDlg").close(); $("libClose").onclick = () => openLib(false); $("libBtn").onclick = () => openLib();
 L.DomEvent.disableClickPropagation($("lib")); L.DomEvent.disableScrollPropagation($("lib"));
 // migrate: a route saved before the library existed becomes the first library entry
 (() => {
-  if (curId && lib.some(r => r.id === curId)) { curName = lib.find(r => r.id === curId).name; curSrc = lib.find(r => r.id === curId).src; return }
+  if (curId && lib.some(r => r.id === curId)) { curFolder = lib.find(r => r.id === curId).folder; curName = lib.find(r => r.id === curId).name; curSrc = lib.find(r => r.id === curId).src; return }
   curId = null; const raw = store.get(KEY.route); let d = null; try { d = JSON.parse(raw || "null") } catch (e) { }
   if (d && ((d.anchors && d.anchors.length) || (d.wpts && d.wpts.length))) { curSrc = d.segs && d.segs.some(x => x.imported) ? "imported" : "created"; curName = curSrc === "imported" ? "Imported route" : "My route"; setTimeout(libSave, 0) }
 })();
@@ -1117,4 +1175,4 @@ load(); updLegend(); render(); renderW(); updHint(); renderLib();
 if (segs.some(s => s.mode === "snap" && !s.fallback && s.cv !== CUE_VER)) rebuildCues(); else updJoins();
 if (eleWarn || allPts().some(p => p[2] == null)) backfillAll();
 
-window.TP = { libSave, openRoute, renameRoute, delRoute, dupRoute, newRoute, openLib, lib: () => lib, junctionAt, routeArms, angDiff, osmNodes, classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
+window.TP = { folders: () => folders, newFolder, renameFolder, delFolder, moveRoute, saveDialog, doSave, libSave, openRoute, renameRoute, delRoute, dupRoute, newRoute, openLib, lib: () => lib, junctionAt, routeArms, angDiff, osmNodes, classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
