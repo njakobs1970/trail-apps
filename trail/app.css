@@ -373,3 +373,4 @@ body.libopen .lib{transform:none;visibility:visible;transition:transform 320ms c
 .lib-tools .btn{flex:none;white-space:nowrap;padding:0 14px}
 .lib-q input:focus-visible{box-shadow:none}
 .lib-q input::-webkit-search-cancel-button{opacity:.6}
+.lib-q{min-width:0}.lib-tools{min-width:0}
