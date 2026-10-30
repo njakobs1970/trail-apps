@@ -4,7 +4,7 @@ const SPEED=Number(params.get('speed'))||1; // test hook: ?speed=50 runs 50x fas
 const LS={get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
 let settings=LS.get('settings',{minutes:15,focus:'trail',type:'develop',today:'rest',shortcut:'Log Stretch',autoLog:false});
 if(!settings.hv2){settings.autoLog=false;settings.hv2=1;LS.set('settings',settings)} // auto-open caused stalls when the Shortcut wasn't installed
-const SHORTCUT_INSTALL_URL=''; // iCloud link for the ready-made "Log Stretch" Shortcut
+const SHORTCUT_INSTALL_URL='https://www.icloud.com/shortcuts/1bb052f8ee714b4c8485bb57f35a4260'; // iCloud link for the ready-made "Log Stretch" Shortcut
 settings.focus=Gen.normFocus(settings.focus||settings.bias||'trail');delete settings.bias;settings.type=settings.type||'develop';settings.rest=settings.rest||30;settings.today=settings.today||'rest';
 let dev=LS.get('dev',null)||Dev.fresh();const saveDev=()=>LS.set('dev',dev);
 const TYPES={prerun:'Pre-run warm-up',develop:'Develop',topup:'Top-up',relax:'Relax',random:'Random'};
