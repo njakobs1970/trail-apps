@@ -38,3 +38,7 @@ details label{display:block;margin:10px 0}.chk input{margin-right:8px}
 .timebar b{font-size:17px}
 #cap{width:100%;accent-color:#34c759;height:28px}
 .tb-ticks{display:flex;justify-content:space-between;font-size:11px;opacity:.6;padding:0 2px}
+
+.setup{display:flex;flex-direction:column;gap:10px;text-align:left;margin:8px 0}
+.setup .btn{text-align:center}
+#logState{display:block;margin:8px 0}

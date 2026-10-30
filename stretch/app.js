@@ -2,7 +2,9 @@ const $=s=>document.querySelector(s);
 const params=new URLSearchParams(location.search);
 const SPEED=Number(params.get('speed'))||1; // test hook: ?speed=50 runs 50x faster
 const LS={get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},set:(k,v)=>localStorage.setItem(k,JSON.stringify(v))};
-let settings=LS.get('settings',{minutes:15,focus:'trail',type:'develop',today:'rest',shortcut:'Log Stretch',autoLog:true});
+let settings=LS.get('settings',{minutes:15,focus:'trail',type:'develop',today:'rest',shortcut:'Log Stretch',autoLog:false});
+if(!settings.hv2){settings.autoLog=false;settings.hv2=1;LS.set('settings',settings)} // auto-open caused stalls when the Shortcut wasn't installed
+const SHORTCUT_INSTALL_URL=''; // iCloud link for the ready-made "Log Stretch" Shortcut
 settings.focus=Gen.normFocus(settings.focus||settings.bias||'trail');delete settings.bias;settings.type=settings.type||'develop';settings.rest=settings.rest||30;settings.today=settings.today||'rest';
 let dev=LS.get('dev',null)||Dev.fresh();const saveDev=()=>LS.set('dev',dev);
 const TYPES={prerun:'Pre-run warm-up',develop:'Develop',topup:'Top-up',relax:'Relax',random:'Random'};
@@ -137,14 +139,19 @@ function finish(early){
   run=null;
   const url=shortcutURL(minutes);
   $('#doneMsg').textContent=`${minutes} min · ${routine.label}. Nice work.`;
-  $('#logBtn').href=url; show('done'); renderHistory();
-  if(settings.autoLog&&!early){window.__lastShortcutUrl=url;fire(url)}
+  $('#logBtn').href=url; $('#logBtn').onclick=()=>{const h=LS.get('history',[]);if(h[0]){h[0].logged=true;LS.set('history',h)}setTimeout(()=>{$('#logState').textContent='Sent to Apple Health ✓';renderHistory()},400)};
+  $('#logState').textContent='Saved to History.';
+  const ready=!!settings.healthReady;$('#logBtn').hidden=!ready;$('#healthSetup').hidden=ready;
+  $('#installSc').hidden=!SHORTCUT_INSTALL_URL;if(SHORTCUT_INSTALL_URL)$('#installSc').href=SHORTCUT_INSTALL_URL;
+  show('done'); renderHistory();
+  if(settings.autoLog&&settings.healthReady&&!early){window.__lastShortcutUrl=url;fire(url)}
 }
+function healthReady(){settings.healthReady=true;LS.set('settings',settings);$('#healthSetup').hidden=true;$('#logBtn').hidden=false}
 function fire(url){window.__shortcutCalls=(window.__shortcutCalls||[]).concat(url);try{location.href=url}catch(e){}}
 
 function renderHistory(){
   const h=LS.get('history',[]);
-  $('#histList').innerHTML=h.length?h.map(x=>`<li><b>${new Date(x.date).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}</b> — ${x.minutes} min${x.focusName?' · '+x.focusName:''}${x.complete?'':' (stopped early)'}<small>${x.stretches.join(' · ')}</small></li>`).join(''):'<li>No sessions yet.</li>';
+  $('#histList').innerHTML=h.length?h.map(x=>`<li><b>${new Date(x.date).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}</b> — ${x.minutes} min${x.focusName?' · '+x.focusName:''}${x.complete?'':' (stopped early)'}${x.logged?' · ❤️ Health':''}<small>${x.stretches.join(' · ')}</small></li>`).join(''):'<li>No sessions yet.</li>';
   const week=h.filter(x=>Date.now()-new Date(x.date)<7*864e5).reduce((a,x)=>a+x.minutes,0);
   $('#histWeek').textContent=week+' min in the last 7 days';
 }
@@ -153,6 +160,7 @@ function bindSettings(){
   $('#minutes').value=settings.minutes;$('#rest').value=settings.rest||30;$('#rest').onchange=()=>{settings.rest=Number($('#rest').value);save();newRoutine()};$('#scName').value=settings.shortcut;$('#autoLog').checked=settings.autoLog;
   const save=()=>{settings={...settings,minutes:Number($('#minutes').value),shortcut:$('#scName').value.trim()||'Log Stretch',autoLog:$('#autoLog').checked};LS.set('settings',settings)};
   $('#minutes').addEventListener('change',()=>{save();newRoutine()});
+  $('#scReady').onclick=()=>{healthReady();$('#logBtn').click()};$('#scSkip').onclick=()=>show('home');
   const capLbl=()=>{const v=Number($('#cap').value);$('#capLbl').textContent=v>=45?'Full session':v+' min max'};
   $('#cap').value=settings.cap||45;capLbl();
   $('#cap').addEventListener('input',capLbl);

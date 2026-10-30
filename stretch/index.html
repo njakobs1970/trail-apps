@@ -32,7 +32,7 @@
  <ol id="planList" class="list"></ol>
  <details class="card"><summary>Apple Health logging</summary>
   <label>Shortcut name <input id="scName"></label>
-  <label class="chk"><input type="checkbox" id="autoLog"> Open Shortcut automatically at the end</label>
+  <label class="chk"><input type="checkbox" id="autoLog"> Open Shortcut automatically at the end (only once it is installed)</label>
   <button id="testSc" class="ghost">Test Shortcut (logs 1 min)</button>
   <p class="muted">Setup steps are in the README. Gentle stretching only — stop if anything hurts.</p></details>
  <button id="startBtn" class="primary">Start</button>
@@ -48,7 +48,13 @@
  <p id="pCue" class="cue"></p><div id="pDesc"></div>
 </section>
 <section id="done" hidden><div class="bigicon">✅</div><h2>Done!</h2><p id="doneMsg"></p>
- <a id="logBtn" class="primary btn" href="#">Log to Apple Health</a><button id="homeBtn" class="ghost">Back to start</button></section>
+ <a id="logBtn" class="primary btn" href="#">❤️ Log to Apple Health</a>
+ <div id="healthSetup" class="card setup" hidden><b>Log to Apple Health (one-time setup)</b>
+  <p class="desc">Web apps can't write to Health directly, so a small Shortcut called <b>Log Stretch</b> does it. Install it once, then logging is one tap.</p>
+  <a id="installSc" class="primary btn" href="#" target="_blank" rel="noopener">Get the Log Stretch Shortcut</a>
+  <button id="scReady" class="ghost">I've installed it, log this session</button>
+  <button id="scSkip" class="ghost">Not now</button></div>
+ <small id="logState" class="muted"></small><button id="homeBtn" class="ghost">Back to start</button></section>
 <section id="history" hidden><header><button id="backBtn" class="ghost">‹ Back</button><h1>History</h1></header>
  <p id="histWeek" class="muted"></p><ol id="histList" class="list"></ol>
  <div class="row"><button id="exportHist" class="ghost">Export JSON</button><button id="importHist" class="ghost">Import JSON</button><button id="clearHist" class="ghost">Clear</button></div><input type=file id="importFile" accept="application/json,.json" hidden>
