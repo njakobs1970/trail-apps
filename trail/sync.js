@@ -3,7 +3,7 @@
  * Off (and its UI hidden) unless config.js sets SUPABASE_URL and SUPABASE_ANON_KEY. */
 (() => {
   const URL_ = (window.SUPABASE_URL || "").trim(), KEY_ = (window.SUPABASE_ANON_KEY || "").trim();
-  const SDK = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js";
+  const SDK = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js";
   const REDIRECT = location.hostname === "njakobs1970.github.io" ? "https://njakobs1970.github.io/trail-apps/trail/" : location.origin + location.pathname;
   const $ = id => document.getElementById(id), FLAG = "tp-sync";
   const toast = (t, ms) => window.toast && window.toast(t, ms);
