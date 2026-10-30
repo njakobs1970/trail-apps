@@ -52,6 +52,7 @@
 
 <div id="map" role="application" aria-label="Map. Click to add route points."></div>
 
+<div id="wmark" class="wmark" aria-hidden="true">Trail Planner <span>by GrokBot</span></div>
 <div id="hint" class="hint" role="status" aria-live="polite" hidden>
  <svg class="ic"><use href="#i-snap"/></svg><span id="hintText">Click the map to start your route</span>
 </div>
@@ -128,7 +129,11 @@
  <section id="panel" class="glass" aria-label="Elevation profile">
   <div id="pHandle" role="separator" aria-orientation="horizontal" aria-label="Resize profile" tabindex="0" data-tip="Drag to resize"></div>
   <div class="p-head">
-   <h2>Elevation</h2>
+   <h2 class="sr">Elevation</h2>
+   <div class="seg ptabs" role="tablist" aria-label="Profile view">
+    <button id="tEle" class="on" role="tab" aria-selected="true" data-tip="Elevation profile">Elevation</button>
+    <button id="tCue" role="tab" aria-selected="false" data-tip="Turn cues at junctions  C">Cue sheet</button>
+   </div>
    <div id="scrubRow" aria-live="polite"></div>
    <div class="p-tools">
     <button id="gTog" class="chip on" aria-pressed="true" data-tip="Colour route by gradient  G"><svg class="ic"><use href="#i-grade"/></svg><span>Grade</span></button>
@@ -137,6 +142,7 @@
   </div>
   <div id="legend" class="legend" aria-hidden="true"></div>
   <div id="pwrap"><div id="pEmpty" hidden><svg class="ic"><use href="#i-grade"/></svg><b>No elevation profile yet</b><span>Add two or more points and the profile appears here.</span></div><canvas id="profile" role="img" aria-label="Elevation profile. Drag to move the marker along the route; arrow keys step along it." tabindex="0"></canvas></div>
+  <div id="cues" class="cues" aria-label="Cue sheet"></div>
  </section>
 </div>
 
@@ -152,6 +158,7 @@
    <dt><kbd>E</kbd></dt><dd>Export GPX</dd>
    <dt><kbd>I</kbd></dt><dd>Import GPX</dd>
    <dt><kbd>G</kbd></dt><dd>Colour route by grade on/off</dd>
+   <dt><kbd>C</kbd></dt><dd>Switch Elevation / Cue sheet</dd>
    <dt><kbd>P</kbd></dt><dd>Show/hide elevation profile</dd>
    <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Move along the route (hold <kbd>Shift</kbd> for 500 m)</dd>
    <dt><kbd>L</kbd></dt><dd>Go to my location</dd>

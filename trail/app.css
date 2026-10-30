@@ -12,7 +12,7 @@
   --ease: cubic-bezier(.25,.1,.25,1); --t: 200ms;
 
   --bg: #f5f5f7;
-  --glass: rgba(250,250,252,.86);
+  --glass: #fbfbfd;   /* solid: nothing frosts or tints the map */
   --glass-solid: #fbfbfd;
   --stroke: rgba(0,0,0,.08);
   --sep: rgba(60,60,67,.14);
@@ -35,7 +35,7 @@
 }
 @media (prefers-color-scheme: dark){
   :root{
-    --bg:#000; --glass: rgba(30,30,32,.84); --glass-solid:#1c1c1e;
+    --bg:#000; --glass: #1c1c1e; --glass-solid:#1c1c1e;
     --stroke: rgba(255,255,255,.09); --sep: rgba(84,84,88,.45);
     --text:#f5f5f7; --text2:#aeaeb2; --text3:#8e8e93;
     --fill: rgba(118,118,128,.24); --fill-h: rgba(118,118,128,.34); --seg-on:#636366;
@@ -47,7 +47,6 @@
     --c-grid: rgba(255,255,255,.08); --c-axis: rgba(255,255,255,.22); --c-label:#98989d; --c-line: rgba(245,245,247,.9);
     --c-cursor:#f5f5f7; --c-gap: rgba(118,118,128,.16); --c-bubble: rgba(245,245,247,.95); --c-bubble-ink:#1d1d1f;
   }
-  .leaflet-tile-pane{filter: brightness(.68) contrast(1.12) saturate(.85)}
 }
 
 /* 2. Base ------------------------------------------------------------------- */
@@ -64,9 +63,8 @@ button{cursor:pointer;-webkit-tap-highlight-color:transparent;touch-action:manip
 #map{position:absolute;inset:0;background:var(--bg)}
 
 /* 3. Glass ------------------------------------------------------------------ */
-.glass{background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);
+.glass{background:var(--glass);
   border:1px solid var(--stroke);box-shadow:var(--shadow);border-radius:var(--r-l)}
-@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){.glass{background:var(--glass-solid)}}
 
 /* 4. Controls --------------------------------------------------------------- */
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:36px;padding:0 12px;border-radius:999px;border:0;
@@ -179,9 +177,9 @@ body.pcol #pwrap,body.pcol .legend,body.pcol #pHandle{display:none}
 
 /* 7. Map & markers ---------------------------------------------------------- */
 .leaflet-container{font-family:var(--font);background:var(--bg)}
-.leaflet-control-attribution{background:var(--glass)!important;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-radius:8px 0 0 0;color:var(--text2)!important;font-size:10px}
+.leaflet-control-attribution{background:var(--glass)!important;border-radius:8px 0 0 0;color:var(--text2)!important;font-size:10px}
 .leaflet-control-attribution a{color:var(--text2)!important}
-.leaflet-control-scale-line{background:var(--glass);border-color:var(--text2);color:var(--text);font-size:10px;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.leaflet-control-scale-line{background:var(--glass);border-color:var(--text2);color:var(--text);font-size:10px;}
 .leaflet-bottom{bottom:calc(var(--ph-desk) + 2*var(--gap))}
 body.pcol .leaflet-bottom{bottom:calc(58px + 2*var(--gap))}
 .leaflet-left{left:calc(var(--side-w) + 2*var(--gap))}
@@ -200,7 +198,7 @@ body.pcol .leaflet-bottom{bottom:calc(58px + 2*var(--gap))}
 .leaflet-tooltip-top:before{border-top-color:var(--glass-solid)}
 /* map control stack (top right) */
 .mapctl{position:absolute;z-index:1001;top:var(--gap);right:var(--gap);display:flex;flex-direction:column;gap:10px;align-items:flex-end}
-.ctl-group{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);border:1px solid var(--stroke);box-shadow:var(--shadow-s)}
+.ctl-group{display:flex;flex-direction:column;border-radius:12px;overflow:hidden;background:var(--glass);border:1px solid var(--stroke);box-shadow:var(--shadow-s)}
 .ctl{width:40px;height:40px;display:grid;place-items:center;border:0;background:transparent;color:var(--text);transition:background var(--t)}
 .ctl:hover{background:var(--fill)}
 .ctl-zoom .ctl+.ctl{border-top:1px solid var(--sep)}
@@ -214,11 +212,11 @@ body.pcol .leaflet-bottom{bottom:calc(58px + 2*var(--gap))}
 body.pcol .toast{bottom:calc(58px + 2*var(--gap) + 12px)}
 @media (min-width:900px){.toast{left:calc(50% + (var(--side-w) + var(--gap))/2)}}
 .hint{position:absolute;z-index:1400;width:max-content;top:var(--gap);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:10px 16px 10px 12px;border-radius:999px;
-  background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);border:1px solid var(--stroke);box-shadow:var(--shadow);
+  background:var(--glass);border:1px solid var(--stroke);box-shadow:var(--shadow);
   font-size:var(--fs-foot);font-weight:600;pointer-events:none;animation:fadeIn 400ms var(--ease)}
 .hint .ic{color:var(--accent)}
 @media (min-width:900px){.hint{left:calc(50% + (var(--side-w) + var(--gap))/2)}}
-.popover{position:absolute;top:0;right:52px;width:210px;padding:6px;border-radius:var(--r);background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);border:1px solid var(--stroke);box-shadow:var(--shadow);animation:fadeIn var(--t) var(--ease)}
+.popover{position:absolute;top:0;right:52px;width:210px;padding:6px;border-radius:var(--r);background:var(--glass);border:1px solid var(--stroke);box-shadow:var(--shadow);animation:fadeIn var(--t) var(--ease)}
 .popover button{display:flex;width:100%;align-items:center;gap:10px;border:0;background:transparent;padding:8px 10px;border-radius:9px;font-size:var(--fs-foot);text-align:left}
 .popover button:hover{background:var(--fill)}
 .popover button .sw{width:28px;height:28px;border-radius:7px;flex:none;background-size:cover;box-shadow:inset 0 0 0 1px var(--stroke)}
@@ -227,7 +225,7 @@ body.pcol .toast{bottom:calc(58px + 2*var(--gap) + 12px)}
 .popover button[aria-checked="true"]{font-weight:600}
 dialog{border:0;padding:0;border-radius:var(--r-l);background:var(--glass-solid);color:var(--text);box-shadow:var(--shadow);width:min(440px,calc(100% - 32px))}
 dialog[open]{animation:fadeIn var(--t) var(--ease)}
-dialog::backdrop{background:rgba(0,0,0,.28);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px)}
+dialog::backdrop{background:rgba(0,0,0,.18)}
 dialog header{display:flex;align-items:center;justify-content:space-between;padding:14px 12px 6px 20px}
 dialog h2{font-size:var(--fs-head);font-weight:650}
 .keys{display:grid;grid-template-columns:auto 1fr;gap:10px 16px;margin:0;padding:8px 20px 20px;font-size:var(--fs-foot);align-items:center}
@@ -249,10 +247,10 @@ kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;backgr
 @media (max-width:899px){
   :root{--gap:10px}
   #ui{position:absolute;z-index:1000;left:0;right:0;bottom:0;max-height:64%;overflow:auto;overscroll-behavior:contain;
-    background:var(--glass);-webkit-backdrop-filter:saturate(180%) blur(22px);backdrop-filter:saturate(180%) blur(22px);
+    background:var(--glass);
     border-top:1px solid var(--stroke);border-radius:var(--r-l) var(--r-l) 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.12);
     padding:12px 12px calc(10px + env(safe-area-inset-bottom));padding-left:calc(12px + env(safe-area-inset-left));padding-right:calc(12px + env(safe-area-inset-right))}
-  #side,#panel{position:static;width:auto;height:auto;max-height:none;overflow:visible;background:none;border:0;box-shadow:none;border-radius:0;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0}
+  #side,#panel{position:static;width:auto;height:auto;max-height:none;overflow:visible;background:none;border:0;box-shadow:none;border-radius:0;padding:0}
   #side{display:flex;flex-direction:column;gap:10px}
   .brand,.prefs,.mode-hint,#pHandle,.stat-x{display:none}
   .stats{grid-template-columns:repeat(4,1fr);order:0}
@@ -295,4 +293,41 @@ kbd{display:inline-block;min-width:22px;padding:2px 6px;border-radius:6px;backgr
   .toast,body.pcol .toast{bottom:calc(var(--sheet-h) + 12px);border-radius:14px}
   .hint{top:calc(var(--gap) + env(safe-area-inset-top));max-width:calc(100% - 90px);left:calc(50% - 22px)}
   .popover{right:54px}
+}
+
+/* 10. Cue sheet tab & watermark ---------------------------------------------- */
+.sr{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.ptabs{grid-template-columns:1fr 1fr;flex:none;width:210px}
+.ptabs button{height:28px;font-size:12px}
+.cues{display:none;flex:1;min-height:0;flex-direction:column}
+#panel.cuetab .cues{display:flex}
+#panel.cuetab #pwrap,#panel.cuetab .legend{display:none}
+.cue-top{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:2px 4px 6px;font-size:var(--fs-foot);color:var(--text2);font-weight:600}
+.cue-top small{font-weight:500;color:var(--text3)}
+.tgl{display:inline-flex;align-items:center;gap:6px;font-weight:500;white-space:nowrap;cursor:pointer}
+.tgl input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.cue-list{list-style:none;margin:0;padding:0;overflow:auto;flex:1;min-height:0;border-radius:var(--r);background:var(--glass-solid);border:1px solid var(--sep)}
+.cue-list li+li{border-top:1px solid var(--sep)}
+.cue{display:grid;grid-template-columns:32px 1fr 76px 60px 76px;align-items:center;gap:10px;width:100%;padding:7px 12px 7px 8px;border:0;background:transparent;text-align:left;font-size:var(--fs-foot);transition:background var(--t)}
+.cue:hover{background:var(--fill)}
+.cue-ic{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:var(--accent-soft);color:var(--accent)}
+.cue-ic .ic{width:18px;height:18px;stroke-width:2.1}
+.cue-START .cue-ic{background:rgba(48,177,88,.16);color:#30b158}.cue-END .cue-ic{background:var(--fill);color:var(--text)}
+.cue-C .cue-ic{background:var(--fill);color:var(--text2)}
+.cue-t{font-weight:600}
+.cue-d,.cue-e,.cue-n{text-align:right;color:var(--text2);font-variant-numeric:tabular-nums}
+.cue-n{color:var(--text3)}
+.wmark{position:absolute;z-index:900;pointer-events:none;user-select:none;-webkit-user-select:none;left:calc(var(--side-w) + 2*var(--gap) + 4px);bottom:calc(var(--ph-desk) + 2*var(--gap) + 6px);
+  font:600 11px/1 var(--font);letter-spacing:.02em;color:rgba(29,29,31,.55);text-shadow:0 0 3px rgba(255,255,255,.9),0 0 1px rgba(255,255,255,.9)}
+.wmark span{font-weight:500}
+body.pcol .wmark{bottom:calc(58px + 2*var(--gap) + 6px)}
+@media (prefers-color-scheme: dark){.wmark{color:rgba(255,255,255,.7);text-shadow:0 0 3px rgba(0,0,0,.85),0 0 1px rgba(0,0,0,.9)}}
+@media (max-width:899px){
+  .ptabs{width:auto;flex:1}
+  .ptabs button{height:32px;font-size:var(--fs-foot)}
+  #panel.cuetab #scrubRow{display:none}
+  .cues{height:170px;flex:none}
+  .cue{grid-template-columns:30px 1fr auto auto;gap:8px;padding:9px 8px;min-height:44px}
+  .cue-n{display:none}
+  .wmark,body.pcol .wmark{left:calc(var(--gap) + 4px + env(safe-area-inset-left));top:calc(var(--gap) + 6px + env(safe-area-inset-top));bottom:auto}
 }

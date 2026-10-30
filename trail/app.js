@@ -9,7 +9,9 @@
  *                               12. Persistence & boot
  *
  * Route model: anchors[i] = {lat,lng}; segs[i] joins anchors[i] -> anchors[i+1]
- *   seg = {mode:'snap'|'free', pts:[[lat,lng,ele|null]], fallback?, imported?}
+ *   seg = {mode:'snap'|'free', pts:[[lat,lng,ele|null]], fallback?, imported?, cues?:[{i,t}]}
+ *   cues: BRouter junction hints, i = index into seg.pts, t = VoiceHint code (TL, KR, C …).
+ *   Missing cues on an old saved snap leg are rebuilt lazily (rebuildCues).
  * State (anchors, segs, wpts, mode, pending, map ...) is deliberately top-level so the
  * headless tests can inspect it; window.TP exposes the pure helpers.
  */
@@ -32,7 +34,7 @@ const GPX_TOL_M = 2, GPX_MAX_PTS = 3000;
 const NAISMITH_CLIMB_M_PER_H = 600, NAISMITH_BASE_KMH = 5;
 const PANEL_MIN_PX = 230, PANEL_MAX_FRAC = .75;
 const DESKTOP_MIN_W = 900;
-const KEY = { route: "tp-route", collapsed: "tp-ui", grade: "tp-grade", panelH: "tp-ph", layer: "tp-layer", pace: "tp-pace", onboarded: "tp-onboarded" };
+const KEY = { cues: "tp-cues", tab: "tp-tab", route: "tp-route", collapsed: "tp-ui", grade: "tp-grade", panelH: "tp-ph", layer: "tp-layer", pace: "tp-pace", onboarded: "tp-onboarded" };
 
 // Gradient bands: [upper bound %, colour, legend label]. First band = steep descent.
 const GB = [[-10, "#3b82f6", "Descent ≥10%"], [3, "#34c759", "< 3%"], [6, "#ffcc00", "3–6%"], [10, "#ff9500", "6–10%"], [15, "#ff3b30", "10–15%"], [Infinity, "#8e1b1b", "≥ 15%"]];
@@ -194,18 +196,84 @@ async function fillEle(pts) {
   updEleWarn();
   return pts.filter(p => p[2] == null).length;
 }
-async function route(a, b) {
-  const url = `${BROUTER}?lonlats=${a.lng.toFixed(6)},${a.lat.toFixed(6)}|${b.lng.toFixed(6)},${b.lat.toFixed(6)}&profile=${BROUTER_PROFILE}&alternativeidx=0&format=geojson`;
+async function route(a, b, quiet) {
+  const url = `${BROUTER}?lonlats=${a.lng.toFixed(6)},${a.lat.toFixed(6)}|${b.lng.toFixed(6)},${b.lat.toFixed(6)}&profile=${BROUTER_PROFILE}&alternativeidx=0&format=geojson&turnInstructionMode=9`;
   try {
     const ctl = new AbortController(), t = setTimeout(() => ctl.abort(), ROUTE_TIMEOUT_MS);
     const r = await fetch(url, { signal: ctl.signal }); clearTimeout(t);
     if (!r.ok) throw new Error(await r.text());
-    const c = (await r.json()).features[0].geometry.coordinates;
-    return { pts: c.map(x => [x[1], x[0], x.length > 2 ? x[2] : null]), fallback: false };
+    const f = (await r.json()).features[0], c = f.geometry.coordinates;
+    return { pts: c.map(x => [x[1], x[0], x.length > 2 ? x[2] : null]), fallback: false, cues: parseHints(f.properties?.voicehints, c.length) };
   } catch (e) {
-    console.warn("BRouter failed", e); toast("No trail route found – used a straight line");
-    return { pts: densify([a.lat, a.lng], [b.lat, b.lng]), fallback: true };
+    console.warn("BRouter failed", e); if (!quiet) toast("No trail route found – used a straight line");
+    return { pts: densify([a.lat, a.lng], [b.lat, b.lng]), fallback: true, cues: [] };
   }
+}
+
+/* 4b. Cue sheet: turn cues at junctions only ---------------------------------
+ * Snap legs: BRouter voicehints (turnInstructionMode=9). BRouter emits a hint only where the
+ * way network branches, so bends along a single path never produce one. Hint = [ptIndex, cmd, exit, distToNext, angle, …].
+ * Freehand / imported legs have no junction data: they get no cues (Start/Finish still added).
+ * Leg joins get a cue only when the route really turns there (>= JOIN_TURN_DEG). */
+const VH = { 1: "C", 2: "TL", 3: "TSLL", 4: "TSHL", 5: "TR", 6: "TSLR", 7: "TSHR", 8: "KL", 9: "KR", 10: "TU", 11: "TU", 13: "RNDB", 14: "RNDB", 15: "TU", 17: "KL", 18: "KR" };
+const CUE = {
+  C: { txt: "Straight on at junction", ab: "S", sym: "Straight", ic: "c-straight" },
+  TL: { txt: "Turn left", ab: "L", sym: "Left", ic: "c-left" }, TR: { txt: "Turn right", ab: "R", sym: "Right", ic: "c-right" },
+  TSLL: { txt: "Bear left", ab: "BL", sym: "Slight Left", ic: "c-sleft" }, TSLR: { txt: "Bear right", ab: "BR", sym: "Slight Right", ic: "c-sright" },
+  TSHL: { txt: "Sharp left", ab: "SHL", sym: "Sharp Left", ic: "c-shleft" }, TSHR: { txt: "Sharp right", ab: "SHR", sym: "Sharp Right", ic: "c-shright" },
+  KL: { txt: "Keep left", ab: "KL", sym: "Left Fork", ic: "c-kleft" }, KR: { txt: "Keep right", ab: "KR", sym: "Right Fork", ic: "c-kright" },
+  TU: { txt: "Turn around", ab: "U", sym: "U-Turn", ic: "c-uturn" }, RNDB: { txt: "Roundabout", ab: "RB", sym: "Straight", ic: "c-straight" },
+  START: { txt: "Start", ab: "Start", sym: "Flag, Green", ic: "c-start" }, END: { txt: "Finish", ab: "Finish", sym: "Flag, Red", ic: "c-end" },
+};
+const FLIP = { TL: "TR", TR: "TL", TSLL: "TSLR", TSLR: "TSLL", TSHL: "TSHR", TSHR: "TSHL", KL: "KR", KR: "KL", C: "C", TU: "TU", RNDB: "RNDB" };
+const CUE_DEDUP_M = 20, JOIN_TURN_DEG = 50, JOIN_ARM_M = 30;
+let cuesOn = store.get(KEY.cues) !== "off";
+function parseHints(vh, n) {
+  if (!Array.isArray(vh)) return [];
+  return vh.map(h => ({ i: +h[0], t: VH[h[1]] })).filter(c => c.t && c.i > 0 && c.i < n - 1);
+}
+/** Cues of a leg travelled backwards: mirror indices, swap left/right. */
+const reverseCues = (cues, n) => (cues || []).map(c => ({ i: n - 1 - c.i, t: FLIP[c.t] || c.t })).reverse();
+function bearing(a, b) { const y = Math.sin((b[1] - a[1]) * RAD) * Math.cos(b[0] * RAD), x = Math.cos(a[0] * RAD) * Math.sin(b[0] * RAD) - Math.sin(a[0] * RAD) * Math.cos(b[0] * RAD) * Math.cos((b[1] - a[1]) * RAD); return Math.atan2(y, x) / RAD }
+/** Signed turn angle (deg, + = right) at P[i], measured over ~JOIN_ARM_M arms so GPS jitter is ignored. */
+function turnAt(P, cum, i) {
+  let a = i, b = i; while (a > 0 && cum[i] - cum[a] < JOIN_ARM_M) a--; while (b < P.length - 1 && cum[b] - cum[i] < JOIN_ARM_M) b++;
+  if (a === i || b === i) return 0; let d = bearing(P[i], P[b]) - bearing(P[a], P[i]); d = ((d + 540) % 360) - 180; return d;
+}
+const turnCode = d => { const a = Math.abs(d); return a > 150 ? "TU" : a > 120 ? (d > 0 ? "TSHR" : "TSHL") : d > 0 ? "TR" : "TL" };
+/** Merge per-leg cues into one list along trackPts(): {d, ll, ele, t, txt}. */
+function buildCues(P = SC.pts, cum = SC.cum) {
+  if (P.length < 2) return [];
+  const raw = [{ g: 0, t: "START", pr: 3 }]; let base = 0;
+  segs.forEach((s, j) => {
+    const n = s.pts.length; if (!n) return;
+    (s.cues || []).forEach(c => { if (c.i > 0 && c.i < n - 1) raw.push({ g: base + c.i, t: c.t, pr: c.t === "C" ? 1 : 2 }) });
+    base += n - 1;
+    if (j < segs.length - 1 && base > 0 && base < P.length - 1) { const d = turnAt(P, cum, base); if (Math.abs(d) >= JOIN_TURN_DEG) raw.push({ g: base, t: turnCode(d), pr: 1.5, join: true }) }
+  });
+  raw.push({ g: P.length - 1, t: "END", pr: 3 });
+  raw.forEach(c => { c.g = Math.max(0, Math.min(P.length - 1, c.g)); c.d = cum[c.g] });
+  raw.sort((a, b) => a.d - b.d || b.pr - a.pr);
+  const out = [];
+  for (const c of raw) {
+    const last = out.at(-1);
+    if (last && c.d - last.d < CUE_DEDUP_M) { if (c.pr > last.pr && last.t !== "START") out[out.length - 1] = c; continue }
+    out.push(c);
+  }
+  const fin = raw.at(-1); if (out.at(-1) !== fin) { if (out.length > 1 && fin.d - out.at(-1).d < CUE_DEDUP_M) out.pop(); out.push(fin) }
+  return out.map((c, k) => ({ d: c.d, ll: [P[c.g][0], P[c.g][1]], ele: P[c.g][2], t: c.t, txt: CUE[c.t].txt, next: k < out.length - 1 ? null : 0 }))
+    .map((c, k, a) => ({ ...c, next: k < a.length - 1 ? a[k + 1].d - c.d : 0 }));
+}
+/** Old saved snap legs have no cues: re-ask BRouter once and map its hints onto the stored points. */
+async function rebuildCues() {
+  for (const s of segs) {
+    if (s.mode !== "snap" || s.fallback || s.imported || Array.isArray(s.cues) || s.pts.length < 3) continue;
+    const r = await route({ lat: s.pts[0][0], lng: s.pts[0][1] }, { lat: s.pts.at(-1)[0], lng: s.pts.at(-1)[1] }, true);
+    if (r.fallback) continue;
+    s.cues = r.cues.map(c => { const q = r.pts[c.i]; let bi = 0, bd = Infinity; s.pts.forEach((p, k) => { const d = hav(p, q); if (d < bd) { bd = d; bi = k } }); return bd < 25 ? { i: bi, t: c.t } : null })
+      .filter(c => c && c.i > 0 && c.i < s.pts.length - 1);
+  }
+  save(); render();
 }
 
 /* 5. Route editing & drawing --------------------------------------------------- */
@@ -224,14 +292,14 @@ function trackPts() { const o = []; segs.forEach(s => s.pts.forEach((p, k) => { 
 async function buildSeg(i) {
   const s = segs[i], a = anchors[i], b = anchors[i + 1]; setBusy(1);
   try {
-    if (s.mode === "snap") { const r = await route(a, b); if (segs[i] !== s) return; s.pts = r.pts; s.fallback = r.fallback }
+    if (s.mode === "snap") { const r = await route(a, b); if (segs[i] !== s) return; s.pts = r.pts; s.fallback = r.fallback; s.cues = r.cues }
     else {
       const pv = i > 0 && segs[i - 1].pts.length ? segs[i - 1].pts.at(-1) : null;
       s.pts[0] = pv ? [pv[0], pv[1], null] : [a.lat, a.lng, null]; s.pts[s.pts.length - 1] = [b.lat, b.lng, null];
     }
     await fillEle(s.pts);
   } finally { setBusy(-1) }
-  if (segs[i] === s) render();
+  if (segs[i] === s) { render(); save() }
 }
 function addAnchor(ll) { anchors.push({ lat: ll.lat, lng: ll.lng }); addMarker(anchors.length - 1); updHint() }
 function addMarker(i) {
@@ -253,7 +321,7 @@ function returnPath() {
   if (anchors.length < 2 || segs.length !== anchors.length - 1 || segs.some(s => !s.pts.length)) return toast("Finish drawing the route first");
   for (let i = segs.length - 1; i >= 0; i--) {
     const s = segs[i]; anchors.push({ ...anchors[i] }); addMarker(anchors.length - 1);
-    segs.push({ mode: s.mode, pts: s.pts.map(p => [...p]).reverse(), ...(s.fallback ? { fallback: true } : {}) });
+    segs.push({ mode: s.mode, pts: s.pts.map(p => [...p]).reverse(), ...(s.fallback ? { fallback: true } : {}), ...(s.imported ? { imported: true } : {}), ...(Array.isArray(s.cues) ? { cues: reverseCues(s.cues, s.pts.length) } : {}) });
   }
   render(); save(); updHint(); toast("Return leg added – Undo removes it a point at a time");
 }
@@ -290,7 +358,7 @@ function endDraw() {
   if (pts.length < 2 || hav(pts[0], pts.at(-1)) < 5 && pts.length < 3) { save(); render(); return }
   const d = [pts[0]]; for (let i = 1; i < pts.length; i++) d.push(...densify(pts[i - 1], pts[i], FREEHAND_FILL_M).slice(1));
   const end = pts.at(-1); addAnchor({ lat: end[0], lng: end[1] });
-  segs.push({ mode: "free", pts: d }); buildSeg(segs.length - 1); save();
+  segs.push({ mode: "free", pts: d, cues: [] }); buildSeg(segs.length - 1); save();
 }
 mc.addEventListener("pointerup", endDraw); mc.addEventListener("pointercancel", endDraw);
 
@@ -349,7 +417,7 @@ function render() {
   const pts = trackPts(); let dist = 0; const prof = [];
   pts.forEach((p, i) => { if (i) dist += hav(pts[i - 1], p); prof.push([dist, p[2]]) });
   const cs = climbSeries(pts);
-  Object.assign(SC, { pts, cum: prof.map(q => q[0]), up: cs.up, prof, D: dist }); SC.gr = gradeArr(pts, SC.cum);
+  Object.assign(SC, { cues: [], pts, cum: prof.map(q => q[0]), up: cs.up, prof, D: dist }); SC.gr = gradeArr(pts, SC.cum);
   gradeLines(); scrubHit();
   let lo = Infinity, hi = -Infinity; for (const p of pts) if (p[2] != null) { if (p[2] < lo) lo = p[2]; if (p[2] > hi) hi = p[2] }
   $("dist").innerHTML = `${(dist / 1000).toFixed(2)} <small>km</small>`;
@@ -359,7 +427,7 @@ function render() {
   $("eMax").innerHTML = isFinite(hi) ? `${Math.round(hi)} <small>m</small>` : "–";
   $("eTime").textContent = dist > 0 ? fmtDur(naismith(dist, cs.total, pace)) : "–";
   $("exp").disabled = pts.length < 2; $("undo").disabled = !anchors.length; $("ret").disabled = anchors.length < 2;
-  drawProfile(prof);
+  drawProfile(prof); renderCues();
 }
 let renderQueued = false;
 const renderSoon = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render() }) };
@@ -531,6 +599,37 @@ function scrubHit() {
   scrubUpdate();
 }
 
+/* 8b. Cue sheet tab ----------------------------------------------------------- */
+let tab = store.get(KEY.tab) === "cues" ? "cues" : "ele";
+const CUE_SVG = {
+  "c-straight": '<path d="M12 20V4M7 9l5-5 5 5"/>', "c-left": '<path d="M16 20v-7a3 3 0 0 0-3-3H5M9 6l-4 4 4 4"/>', "c-right": '<path d="M8 20v-7a3 3 0 0 1 3-3h8M15 6l4 4-4 4"/>',
+  "c-sleft": '<path d="M14 20v-6L7 7M7 12V7h5"/>', "c-sright": '<path d="M10 20v-6l7-7M17 12V7h-5"/>',
+  "c-shleft": '<path d="M16 20V8L6 18M6 12v6h6"/>', "c-shright": '<path d="M8 20V8l10 10M18 12v6h-6"/>',
+  "c-kleft": '<path d="M12 20v-6L7 7M7 12V7h5M12 14l5-7"/>', "c-kright": '<path d="M12 20v-6l5-7M17 12V7h-5M12 14 7 7"/>',
+  "c-uturn": '<path d="M8 20V9a4 4 0 0 1 8 0v4M12 10l4 4 4-4"/>', "c-start": '<circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="2.5"/>', "c-end": '<path d="M6 21V4M6 4h11l-2.5 4L17 12H6"/>',
+};
+const cueIcon = t => `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${CUE_SVG[CUE[t].ic]}</svg>`;
+function setTab(t) {
+  tab = t; store.set(KEY.tab, t);
+  for (const [id, k] of [["tEle", "ele"], ["tCue", "cues"]]) { $(id).classList.toggle("on", t === k); $(id).setAttribute("aria-selected", t === k) }
+  $("panel").classList.toggle("cuetab", t === "cues");
+  if (document.body.classList.contains("pcol")) setPanel(false);
+  measureSheet(); renderSoon();
+}
+function renderCues() {
+  SC.cues = buildCues(); const el = $("cues"); if (!el) return;
+  if (tab !== "cues") return;
+  const turns = SC.cues.filter(c => c.t !== "START" && c.t !== "END").length;
+  el.innerHTML = `<div class="cue-top"><span>${SC.pts.length < 2 ? "No route yet" : turns ? `${turns} junction${turns > 1 ? "s" : ""}` : "No junction turns"}${segs.some(s => s.mode === "free" || s.imported) ? `<small> · freehand/imported legs have no junction cues</small>` : ""}</span>` +
+    `<label class="tgl"><input type="checkbox" id="cueGpx"${cuesOn ? " checked" : ""}><span>Include in GPX</span></label></div>` +
+    `<ol class="cue-list">${SC.pts.length < 2 ? "" : SC.cues.map((c, k) => `<li><button class="cue cue-${c.t}" data-k="${k}">` +
+      `<span class="cue-ic">${cueIcon(c.t)}</span><span class="cue-t">${c.txt}</span>` +
+      `<span class="cue-d">${(c.d / 1000).toFixed(2)} km</span><span class="cue-e">${c.ele != null ? Math.round(c.ele) + " m" : "–"}</span>` +
+      `<span class="cue-n">${c.next ? "→ " + (c.next < 1000 ? Math.round(c.next) + " m" : (c.next / 1000).toFixed(2) + " km") : ""}</span></button></li>`).join("")}</ol>`;
+  $("cueGpx").onchange = e => { cuesOn = e.target.checked; store.set(KEY.cues, cuesOn ? "" : "off") };
+  el.querySelectorAll(".cue").forEach(b => b.onclick = () => { const c = SC.cues[+b.dataset.k]; setScrub(c.d); map.panTo(c.ll) });
+}
+
 /* 9. Waypoints --------------------------------------------------------------- */
 let wpts = [], wmarkers = [];
 const wType = t => WTYPES[t] || WTYPES.other;
@@ -572,13 +671,13 @@ function renderW() {
 }
 
 /* 10. GPX export / import ----------------------------------------------------- */
-function makeGpx(name, pts, wps = wpts) {
+function makeGpx(name, pts, wps = wpts, cues = []) {
   let tol = GPX_TOL_M, out = simplify(pts, tol); while (out.length > GPX_MAX_PTS) { tol *= 1.5; out = simplify(pts, tol) }
   const n = esc(name);
   return `<?xml version="1.0" encoding="UTF-8"?>
 <gpx version="1.1" creator="Trail Planner" xmlns="http://www.topografix.com/GPX/1/1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.topografix.com/GPX/1/1 http://www.topografix.com/GPX/1/1/gpx.xsd">
   <metadata><name>${n}</name><time>${new Date().toISOString().replace(/\.\d+Z/, "Z")}</time></metadata>
-${wps.map(w => `  <wpt lat="${(+w.lat).toFixed(6)}" lon="${(+w.lng).toFixed(6)}">${w.ele != null ? `<ele>${(+w.ele).toFixed(1)}</ele>` : ""}<name>${esc(w.name || wType(w.type).label)}</name><sym>${esc(wType(w.type).sym)}</sym><type>${w.type}</type></wpt>\n`).join("")}  <trk><name>${n}</name><type>trail_running</type><trkseg>
+${cues.map(c => `  <wpt lat="${c.ll[0].toFixed(6)}" lon="${c.ll[1].toFixed(6)}">${c.ele != null ? `<ele>${(+c.ele).toFixed(1)}</ele>` : ""}<name>${esc(c.t === "START" || c.t === "END" ? CUE[c.t].txt : CUE[c.t].ab + " " + (c.d / 1000).toFixed(1) + "km")}</name><desc>${esc(`${c.txt} at ${(c.d / 1000).toFixed(2)} km${c.ele != null ? `, ${Math.round(c.ele)} m` : ""}${c.next ? ` – next cue in ${(c.next / 1000).toFixed(2)} km` : ""}`)}</desc><sym>${esc(CUE[c.t].sym)}</sym><type>cue</type></wpt>\n`).join("")}${wps.map(w => `  <wpt lat="${(+w.lat).toFixed(6)}" lon="${(+w.lng).toFixed(6)}">${w.ele != null ? `<ele>${(+w.ele).toFixed(1)}</ele>` : ""}<name>${esc(w.name || wType(w.type).label)}</name><sym>${esc(wType(w.type).sym)}</sym><type>${w.type}</type></wpt>\n`).join("")}  <trk><name>${n}</name><type>trail_running</type><trkseg>
 ${out.map(p => `    <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}">${p[2] != null ? `<ele>${(+p[2]).toFixed(1)}</ele>` : ""}</trkpt>`).join("\n")}
   </trkseg></trk>
 </gpx>
@@ -591,7 +690,7 @@ async function exportGpx() {
     if (n && !confirm(`Elevation service unavailable: ${n} of ${trackPts().length} track points have no elevation. Your watch/app will show no climb for those.\n\nExport anyway (points without data get no <ele>)?`)) return;
   }
   const name = (prompt("Route name", importName || "Titahi Bay trail run") || "").trim(); if (!name) return;
-  const gpx = makeGpx(name, trackPts()), fn = name.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") + ".gpx";
+  render(); const gpx = makeGpx(name, trackPts(), wpts, cuesOn ? SC.cues : []), fn = name.replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "_") + ".gpx";
   const file = new File([gpx], fn, { type: "application/gpx+xml" });
   if (navigator.canShare && navigator.canShare({ files: [file] }) && /Mobi|Android|iPhone|iPad/.test(navigator.userAgent)) {
     try { await navigator.share({ files: [file], title: name }); return } catch (e) { if (e.name === "AbortError") return }
@@ -609,7 +708,7 @@ function parseGpx(text) {
   const nm = q(d, "trk")[0] || q(d, "rte")[0] || q(d, "metadata")[0];
   const name = nm && q(nm, "name")[0] ? q(nm, "name")[0].textContent.trim() : "";
   const SYM = { "drinking water": "drink", restaurant: "food", "scenic area": "viewpoint", restroom: "toilet" };
-  const w = q(d, "wpt").map(e => {
+  const w = q(d, "wpt").filter(e => { const ty = q(e, "type")[0]; return !(ty && ty.textContent.trim() === "cue") }).map(e => {
     const p = pt(e), n = q(e, "name")[0], sy = q(e, "sym")[0], ty = q(e, "type")[0];
     const t = ty && WTYPES[ty.textContent.trim()] ? ty.textContent.trim() : (sy && SYM[sy.textContent.trim().toLowerCase()]) || "other";
     return { lat: p[0], lng: p[1], ele: p[2], type: t, name: (n && n.textContent.trim()) || WTYPES[t].label };
@@ -625,7 +724,7 @@ async function importGpx(text) {
   if (g.pts.length >= 2) {
     const pts = g.pts.filter((p, i) => !i || hav(g.pts[i - 1], p) > .5);
     addAnchor({ lat: pts[0][0], lng: pts[0][1] }); addAnchor({ lat: pts.at(-1)[0], lng: pts.at(-1)[1] });
-    segs.push({ mode: "free", imported: true, pts }); fresh = pts;
+    segs.push({ mode: "free", imported: true, pts, cues: [] }); fresh = pts;
   }
   g.wpts.forEach(w => { wpts.push(w); wmarkers.push(wMarker(w)) }); renderW();
   fitTo([...fresh.map(p => [p[0], p[1]]), ...g.wpts.map(w => [w.lat, w.lng])]);
@@ -726,7 +825,7 @@ addEventListener("keydown", e => {
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const act = {
     s: () => setMode("snap"), f: () => setMode("free"), w: () => setMode("wpt"), e: exportGpx, i: () => $("impFile").click(),
-    g: () => setGrade(!gOn), p: () => setPanel(!document.body.classList.contains("pcol")), l: () => map.locate({ enableHighAccuracy: true }),
+    g: () => setGrade(!gOn), c: () => setTab(tab === "cues" ? "ele" : "cues"), p: () => setPanel(!document.body.classList.contains("pcol")), l: () => map.locate({ enableHighAccuracy: true }),
     "+": () => map.zoomIn(), "=": () => map.zoomIn(), "-": () => map.zoomOut(), "?": () => $("help").showModal(),
     ArrowRight: SC.pts.length > 1 ? () => stepScrub(1, e.shiftKey) : null, ArrowLeft: SC.pts.length > 1 ? () => stepScrub(-1, e.shiftKey) : null,
     Escape: () => { toggleLayers(false); if (SC.pos != null) setScrub(null); else if ($("wpts").classList.contains("open")) openWpts(false) },
@@ -742,6 +841,7 @@ $("imp").onclick = () => $("impFile").click();
 $("impFile").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; try { await importGpx(await f.text()) } catch (err) { toast("Could not read GPX: " + err.message, 5000) } };
 $("eleWarn").onclick = async () => { const n = await backfillAll(); toast(n ? `Still no elevation for ${n} points (service unavailable?)` : "Elevation filled ✓") };
 $("gTog").onclick = () => setGrade(!gOn);
+$("tEle").onclick = () => setTab("ele"); $("tCue").onclick = () => setTab("cues");
 $("pTog").onclick = () => setPanel(!document.body.classList.contains("pcol"));
 $("loc").onclick = () => map.locate({ enableHighAccuracy: true });
 $("zIn").onclick = () => map.zoomIn(); $("zOut").onclick = () => map.zoomOut();
@@ -762,6 +862,9 @@ function load() {
   if (Array.isArray(s.anchors) && s.anchors.length) {
     s.anchors.forEach(a => addAnchor(a));
     segs = Array.isArray(s.segs) ? s.segs.filter(x => x && Array.isArray(x.pts)) : [];
+    while (segs.length > anchors.length - 1) segs.pop();
+    while (segs.length < anchors.length - 1) segs.push({ mode: "snap", pts: [] });
+    segs.forEach((g, i) => { if (!g.pts.length) buildSeg(i) });   // legs saved before routing finished
     const pts = trackPts(); fitTo([...(pts.length > 1 ? pts : anchors.map(a => [a.lat, a.lng])).map(p => [p[0] ?? p.lat, p[1] ?? p.lng]), ...wpts.map(w => [w.lat, w.lng])], 16);
   }
 }
@@ -769,7 +872,9 @@ setBase(store.get(KEY.layer, "topo"));
 if (store.get(KEY.collapsed) === "col") { document.body.classList.add("pcol"); $("pTog").setAttribute("aria-expanded", "false") }
 if (!gOn) { $("gTog").classList.remove("on"); $("gTog").setAttribute("aria-pressed", "false") }
 measureSheet(); map.invalidateSize();
+setTab(tab);
 load(); updLegend(); render(); renderW(); updHint();
+if (segs.some(s => s.mode === "snap" && !s.fallback && !Array.isArray(s.cues))) rebuildCues();
 if (eleWarn || allPts().some(p => p[2] == null)) backfillAll();
 
-window.TP = { setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
+window.TP = { buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
