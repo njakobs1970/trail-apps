@@ -862,8 +862,9 @@ function parseGpx(text) {
 let importName = "";
 async function importGpx(text) {
   const g = parseGpx(text); if (g.pts.length < 2 && !g.wpts.length) return toast("No track, route or waypoints found in that GPX");
-  if ((anchors.length || wpts.length) && !confirm("Replace the current route and waypoints with the imported GPX?")) return;
+  libSave();                                               // the current route stays in Saved routes
   anchors = []; segs = []; markers.forEach(m => map.removeLayer(m)); markers = []; while (wpts.length) delWpt(0);
+  curId = null; curSrc = "imported"; curName = (g.name || "").trim() || "Imported route";
   let fresh = [];
   if (g.pts.length >= 2) {
     const pts = g.pts.filter((p, i) => !i || hav(g.pts[i - 1], p) > .5);
@@ -964,6 +965,7 @@ addEventListener("keydown", e => {
   if ($("help").open) return;
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return }
+  if (!mod && !e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); openLib(); return }
   if (!mod && e.key.toLowerCase() === "r") { e.preventDefault(); returnPath(); return }
   if (mod || e.altKey) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
@@ -972,7 +974,7 @@ addEventListener("keydown", e => {
     g: () => setGrade(!gOn), c: () => setTab(tab === "cues" ? "ele" : "cues"), p: () => setPanel(!document.body.classList.contains("pcol")), l: () => map.locate({ enableHighAccuracy: true }),
     "+": () => map.zoomIn(), "=": () => map.zoomIn(), "-": () => map.zoomOut(), "?": () => $("help").showModal(),
     ArrowRight: SC.pts.length > 1 ? () => stepScrub(1, e.shiftKey) : null, ArrowLeft: SC.pts.length > 1 ? () => stepScrub(-1, e.shiftKey) : null,
-    Escape: () => { toggleLayers(false); if (SC.pos != null) setScrub(null); else if ($("wpts").classList.contains("open")) openWpts(false) },
+    Escape: () => { toggleLayers(false); if (document.body.classList.contains("libopen")) return openLib(false); if (SC.pos != null) setScrub(null); else if ($("wpts").classList.contains("open")) openWpts(false) },
   }[k];
   if (!act) return;
   e.preventDefault(); act();
@@ -998,9 +1000,9 @@ L.DomEvent.disableClickPropagation($("mapCtl")); L.DomEvent.disableScrollPropaga
 
 /* 12. Persistence & boot ------------------------------------------------------ */
 // Storage format is unchanged from earlier versions: tp-route = {anchors, segs, wpts}.
-function save() { store.set(KEY.route, JSON.stringify({ anchors, segs, wpts })) }
-function load() {
-  let s = null; try { s = JSON.parse(store.get(KEY.route) || "null") } catch (e) { console.warn("Saved route unreadable", e) }
+function save() { const d = { anchors, segs, wpts }; store.set(KEY.route, JSON.stringify(d)); libSaveSoon() }
+function load(s) {
+  if (s === undefined) try { s = JSON.parse(store.get(KEY.route) || "null") } catch (e) { console.warn("Saved route unreadable", e) }
   if (!s || typeof s !== "object") return;
   if (Array.isArray(s.wpts)) s.wpts.forEach(w => { if (!w || !isFinite(w.lat) || !isFinite(w.lng)) return; if (!WTYPES[w.type]) w.type = "other"; wpts.push(w); wmarkers.push(wMarker(w)) });
   if (Array.isArray(s.anchors) && s.anchors.length) {
@@ -1012,13 +1014,107 @@ function load() {
     const pts = trackPts(); fitTo([...(pts.length > 1 ? pts : anchors.map(a => [a.lat, a.lng])).map(p => [p[0] ?? p.lat, p[1] ?? p.lng]), ...wpts.map(w => [w.lat, w.lng])], 16);
   }
 }
+
+/* 12b. Saved routes library ---------------------------------------------------
+ * localStorage: tp-lib = [{id,name,src,created,updated,dist,asc,n,thumb}] (index, newest first)
+ *               tp-r:<id> = {anchors, segs, wpts} (one key per route, so the index stays small)
+ *               tp-cur = id of the route being edited. Any change auto-saves into it. */
+const LIB = "tp-lib", CUR = "tp-cur", RKEY = id => "tp-r:" + id;
+let lib = []; try { lib = JSON.parse(store.get(LIB) || "[]"); if (!Array.isArray(lib)) lib = [] } catch (e) { lib = [] }
+let curId = store.get(CUR) || null, curSrc = "created", curName = "", libT = 0, libQ = "";
+const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const libPut = () => { try { localStorage.setItem(LIB, JSON.stringify(lib)); return true } catch (e) { toast("Storage full – delete some saved routes"); return false } };
+function defName() { const d = new Date(); return "Route · " + d.toLocaleDateString(undefined, { day: "numeric", month: "short" }) + " " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) }
+function routeThumb(pts) {
+  if (pts.length < 2) return "";
+  let a = Infinity, b = -Infinity, c = Infinity, d = -Infinity; const k = Math.cos(pts[0][0] * RAD);
+  for (const p of pts) { const x = p[1] * k, y = -p[0]; a = Math.min(a, x); b = Math.max(b, x); c = Math.min(c, y); d = Math.max(d, y) }
+  const sc = 36 / Math.max(b - a, d - c, 1e-9), ox = (44 - (b - a) * sc) / 2, oy = (44 - (d - c) * sc) / 2, st = Math.max(1, Math.floor(pts.length / 60));
+  const q = []; for (let i = 0; i < pts.length; i += st) q.push(pts[i]); q.push(pts.at(-1));
+  return q.map(p => ((p[1] * k - a) * sc + ox).toFixed(1) + "," + ((-p[0] - c) * sc + oy).toFixed(1)).join(" ");
+}
+function libSave() {
+  clearTimeout(libT);
+  if (!anchors.length && !wpts.length) return;                 // nothing drawn yet: don't create empty entries
+  const pts = trackPts(); let dist = 0; pts.forEach((p, i) => { if (i) dist += hav(pts[i - 1], p) });
+  const now = Date.now();
+  let m = lib.find(r => r.id === curId);
+  if (!m) { curId = newId(); m = { id: curId, name: curName || defName(), src: curSrc, created: now }; lib.unshift(m); store.set(CUR, curId) }
+  Object.assign(m, { updated: now, dist, asc: Math.round(climbSeries(pts).total), n: anchors.length, w: wpts.length, thumb: routeThumb(pts) });
+  try { localStorage.setItem(RKEY(m.id), JSON.stringify({ anchors, segs, wpts })) } catch (e) { toast("Storage full – delete some saved routes") }
+  libPut(); renderLib();
+}
+function libSaveSoon() { clearTimeout(libT); libT = setTimeout(libSave, 400) }
+function resetRoute() {
+  anchors = []; segs = []; markers.forEach(m => map.removeLayer(m)); markers = []; while (wpts.length) delWpt(0); setScrub(null);
+}
+function openRoute(id) {
+  libSave();
+  const m = lib.find(r => r.id === id); if (!m) return;
+  let d = null; try { d = JSON.parse(localStorage.getItem(RKEY(id)) || "null") } catch (e) { }
+  if (!d) return toast("That route could not be read");
+  resetRoute(); curId = id; curSrc = m.src; curName = m.name; store.set(CUR, id);
+  load(d); render(); renderW(); updHint(); store.set(KEY.route, JSON.stringify({ anchors, segs, wpts }));
+  if (segs.some(s => s.mode === "snap" && !s.fallback && s.cv !== CUE_VER)) rebuildCues(); else updJoins();
+  if (allPts().some(p => p[2] == null)) backfillAll();
+  renderLib(); if (!isDesktop()) openLib(false); toast("Opened " + m.name);
+}
+function newRoute() {
+  libSave(); resetRoute(); curId = null; curSrc = "created"; curName = ""; store.set(CUR, "");
+  store.set(KEY.route, JSON.stringify({ anchors, segs, wpts })); render(); renderW(); updHint(); renderLib(); openLib(false); toast("New route – click the map to start");
+}
+function renameRoute(id) {
+  const m = lib.find(r => r.id === id); if (!m) return;
+  const n = prompt("Rename route", m.name); if (n == null || !n.trim()) return;
+  m.name = n.trim().slice(0, 80); if (id === curId) curName = m.name; libPut(); renderLib();
+}
+function dupRoute(id) {
+  libSave(); const m = lib.find(r => r.id === id); if (!m) return; const d = localStorage.getItem(RKEY(id)); if (!d) return;
+  const c = { ...m, id: newId(), name: m.name + " copy", created: Date.now(), updated: Date.now() };
+  try { localStorage.setItem(RKEY(c.id), d) } catch (e) { return toast("Storage full – delete some saved routes") }
+  lib.splice(lib.indexOf(m), 0, c); libPut(); renderLib(); toast("Duplicated " + m.name);
+}
+function delRoute(id) {
+  const m = lib.find(r => r.id === id); if (!m || !confirm(`Delete “${m.name}”? This can’t be undone.`)) return;
+  lib = lib.filter(r => r !== m); localStorage.removeItem(RKEY(id)); libPut();
+  if (id === curId) { resetRoute(); curId = null; curName = ""; curSrc = "created"; store.set(CUR, ""); store.set(KEY.route, JSON.stringify({ anchors, segs, wpts })); render(); renderW(); updHint() }
+  renderLib(); toast("Deleted " + m.name);
+}
+const fmtDate = t => { const d = new Date(t), now = new Date(); return d.toDateString() === now.toDateString() ? d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" }) : d.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(d.getFullYear() !== now.getFullYear() ? { year: "numeric" } : {}) }) };
+function renderLib() {
+  const el = $("libList"); if (!el) return;
+  const q = libQ.trim().toLowerCase(), rows = lib.filter(r => !q || r.name.toLowerCase().includes(q));
+  $("libCount").textContent = lib.length ? `${lib.length} route${lib.length > 1 ? "s" : ""}` : "";
+  el.innerHTML = rows.length ? rows.map(r => `<li class="lrow${r.id === curId ? " cur" : ""}" data-id="${esc(r.id)}">
+    <button class="lopen" data-act="open" aria-label="Open ${esc(r.name)}"><svg class="lthumb" viewBox="0 0 44 44" aria-hidden="true">${r.thumb ? `<polyline points="${r.thumb}"/>` : ""}</svg>
+     <span class="lmain"><span class="lname">${esc(r.name)}</span><span class="lmeta">${(r.dist / 1000 || 0).toFixed(1)} km · ↑${r.asc || 0} m · ${fmtDate(r.updated || r.created)}${r.src === "imported" ? ' · <span class="ltag">GPX</span>' : ""}</span></span></button>
+    <span class="lacts"><button class="icon-btn" data-act="ren" aria-label="Rename" data-tip="Rename"><svg class="ic"><use href="#i-pencil"/></svg></button><button class="icon-btn" data-act="dup" aria-label="Duplicate" data-tip="Duplicate"><svg class="ic"><use href="#i-copy"/></svg></button><button class="icon-btn danger" data-act="del" aria-label="Delete" data-tip="Delete"><svg class="ic"><use href="#i-trash"/></svg></button></span></li>`).join("")
+    : `<li class="lempty">${lib.length ? "No routes match" : "No saved routes yet.<br>Routes you draw or import are saved here automatically."}</li>`;
+}
+function openLib(on = !document.body.classList.contains("libopen")) {
+  document.body.classList.toggle("libopen", on); $("lib").setAttribute("aria-hidden", !on); $("libBtn").setAttribute("aria-expanded", on);
+  if (on) { libSave(); renderLib(); if (isDesktop()) setTimeout(() => $("libQ").focus(), 220) }
+}
+$("libList").onclick = e => {
+  const b = e.target.closest("[data-act]"), li = e.target.closest(".lrow"); if (!b || !li) return; const id = li.dataset.id;
+  ({ open: openRoute, ren: renameRoute, dup: dupRoute, del: delRoute })[b.dataset.act](id);
+};
+$("libQ").oninput = e => { libQ = e.target.value; renderLib() };
+$("libNew").onclick = newRoute; $("libClose").onclick = () => openLib(false); $("libBtn").onclick = () => openLib();
+L.DomEvent.disableClickPropagation($("lib")); L.DomEvent.disableScrollPropagation($("lib"));
+// migrate: a route saved before the library existed becomes the first library entry
+(() => {
+  if (curId && lib.some(r => r.id === curId)) { curName = lib.find(r => r.id === curId).name; curSrc = lib.find(r => r.id === curId).src; return }
+  curId = null; const raw = store.get(KEY.route); let d = null; try { d = JSON.parse(raw || "null") } catch (e) { }
+  if (d && ((d.anchors && d.anchors.length) || (d.wpts && d.wpts.length))) { curSrc = d.segs && d.segs.some(x => x.imported) ? "imported" : "created"; curName = curSrc === "imported" ? "Imported route" : "My route"; setTimeout(libSave, 0) }
+})();
 setBase(store.get(KEY.layer, "topo"));
 if (store.get(KEY.collapsed) === "col") { document.body.classList.add("pcol"); $("pTog").setAttribute("aria-expanded", "false") }
 if (!gOn) { $("gTog").classList.remove("on"); $("gTog").setAttribute("aria-pressed", "false") }
 measureSheet(); map.invalidateSize();
 setTab(tab);
-load(); updLegend(); render(); renderW(); updHint();
+load(); updLegend(); render(); renderW(); updHint(); renderLib();
 if (segs.some(s => s.mode === "snap" && !s.fallback && s.cv !== CUE_VER)) rebuildCues(); else updJoins();
 if (eleWarn || allPts().some(p => p[2] == null)) backfillAll();
 
-window.TP = { junctionAt, routeArms, angDiff, osmNodes, classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
+window.TP = { libSave, openRoute, renameRoute, delRoute, dupRoute, newRoute, openLib, lib: () => lib, junctionAt, routeArms, angDiff, osmNodes, classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests

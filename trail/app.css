@@ -331,3 +331,45 @@ body.pcol .wmark{bottom:calc(58px + 2*var(--gap) + 6px)}
   .cue-n{display:none}
   .wmark,body.pcol .wmark{left:calc(var(--gap) + 4px + env(safe-area-inset-left));top:calc(var(--gap) + 6px + env(safe-area-inset-top));bottom:auto}
 }
+
+/* 11. Saved routes drawer ------------------------------------------------------ */
+.lib{position:absolute;z-index:1200;top:var(--gap);left:var(--gap);bottom:var(--gap);width:var(--side-w);display:flex;flex-direction:column;gap:10px;padding:var(--sp-4);
+  background:var(--glass-solid);border:1px solid var(--stroke);border-radius:var(--r-l);box-shadow:var(--shadow);
+  transform:translateX(calc(-100% - 2*var(--gap)));visibility:hidden;transition:transform 320ms cubic-bezier(.32,.72,0,1),visibility 0s 320ms}
+body.libopen .lib{transform:none;visibility:visible;transition:transform 320ms cubic-bezier(.32,.72,0,1)}
+.lib-h{display:flex;align-items:center;gap:8px}
+.lib-h h2{font-size:var(--fs-head);font-weight:650;letter-spacing:-.01em;flex:1}
+.lib-c{font-size:var(--fs-cap);color:var(--text3)}
+.lib-tools{display:flex;gap:8px}
+.lib-q{flex:1;display:flex;align-items:center;gap:6px;height:36px;padding:0 10px;border-radius:10px;background:var(--fill);color:var(--text3)}
+.lib-q .ic{width:16px;height:16px}
+.lib-q input{flex:1;min-width:0;border:0;background:transparent;outline:none;font-size:var(--fs-foot);color:var(--text)}
+.lib-q:focus-within{box-shadow:var(--focus)}
+.lib-list{list-style:none;margin:0;padding:0;flex:1;min-height:0;overflow:auto;border-radius:var(--r);background:var(--glass);border:1px solid var(--sep)}
+.lrow{display:flex;align-items:center;position:relative}
+.lrow+.lrow::before{content:"";position:absolute;top:0;left:66px;right:0;border-top:1px solid var(--sep)}
+.lopen{flex:1;min-width:0;display:flex;align-items:center;gap:12px;padding:10px 4px 10px 12px;border:0;background:transparent;text-align:left;border-radius:0}
+.lrow:hover{background:var(--fill)}
+.lrow.cur .lname{color:var(--accent)}
+.lthumb{width:44px;height:44px;flex:none;border-radius:9px;background:var(--fill);fill:none;stroke:var(--accent);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.lmain{display:flex;flex-direction:column;min-width:0;gap:2px}
+.lname{font-weight:600;font-size:var(--fs-body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lmeta{font-size:var(--fs-cap);color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ltag{font-weight:600;color:var(--accent)}
+.lacts{display:flex;padding-right:6px;opacity:.55;transition:opacity var(--t)}
+.lrow:hover .lacts,.lrow:focus-within .lacts{opacity:1}
+.lacts .icon-btn{width:30px;height:30px}.lacts .ic{width:17px;height:17px}
+.icon-btn.danger:hover{color:var(--danger)}
+.lempty{padding:28px 16px;text-align:center;color:var(--text3);font-size:var(--fs-foot);line-height:1.5}
+.lib-f{font-size:var(--fs-cap);color:var(--text3);text-align:center}
+#libBtn2{margin-right:-4px}
+@media (min-width:900px){#libBtn{display:none}}
+@media (max-width:899px){
+  #libBtn2{display:none}
+  .lib{top:0;left:0;bottom:0;width:100%;border-radius:0;border:0;padding:calc(12px + env(safe-area-inset-top)) calc(12px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(12px + env(safe-area-inset-left));transform:translateX(-100%)}
+  .lib-q input{font-size:16px}.lib-q{height:44px}.lib-tools .btn{min-height:44px}
+  .lopen{padding:12px 4px 12px 12px}.lacts{opacity:1}.lacts .icon-btn{width:40px;height:40px}
+}
+.lib-tools .btn{flex:none;white-space:nowrap;padding:0 14px}
+.lib-q input:focus-visible{box-shadow:none}
+.lib-q input::-webkit-search-cancel-button{opacity:.6}
