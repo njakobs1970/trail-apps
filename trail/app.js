@@ -976,7 +976,8 @@ addEventListener("keydown", e => {
   const act = {
     s: () => setMode("snap"), f: () => setMode("free"), w: () => setMode("wpt"), e: exportGpx, i: () => $("impFile").click(),
     g: () => setGrade(!gOn), c: () => setTab(tab === "cues" ? "ele" : "cues"), p: () => setPanel(!document.body.classList.contains("pcol")), l: () => map.locate({ enableHighAccuracy: true }),
-    "3": () => set3d(!on3d), "+": () => on3d ? m3.zoomIn() : map.zoomIn(), "=": () => on3d ? m3.zoomIn() : map.zoomIn(), "-": () => on3d ? m3.zoomOut() : map.zoomOut(), "?": () => $("help").showModal(),
+    "3": () => set3d(!on3d), "[": on3d ? () => rot3d(-ROT_STEP) : null, "]": on3d ? () => rot3d(ROT_STEP) : null,
+    ArrowUp: on3d ? () => tilt3d(TILT_STEP) : null, ArrowDown: on3d ? () => tilt3d(-TILT_STEP) : null, n: on3d ? reset3d : null, k: on3d ? toggleOrbit : null, "+": () => on3d ? m3.zoomIn() : map.zoomIn(), "=": () => on3d ? m3.zoomIn() : map.zoomIn(), "-": () => on3d ? m3.zoomOut() : map.zoomOut(), "?": () => $("help").showModal(),
     ArrowRight: SC.pts.length > 1 ? () => stepScrub(1, e.shiftKey) : null, ArrowLeft: SC.pts.length > 1 ? () => stepScrub(-1, e.shiftKey) : null,
     Escape: () => { toggleLayers(false); if (document.body.classList.contains("libopen")) return openLib(false); if (SC.pos != null) setScrub(null); else if ($("wpts").classList.contains("open")) openWpts(false) },
   }[k];
@@ -1051,13 +1052,43 @@ async function set3d(on) {
       });
       m3.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showZoom: false }), "bottom-right");
       m3.on("load", () => { upd3d(); fit3d() });
+      m3.on("rotate", () => { $("c3Reset").firstElementChild.style.transform = `rotate(${-m3.getBearing()}deg)` });
     } else { m3.resize(); upd3d(); fit3d() }
   } else {
-    on3d = false; $("map3d").hidden = true; document.body.classList.remove("v3d"); $("b3d").setAttribute("aria-pressed", "false");
+    stopOrbit(); on3d = false; $("map3d").hidden = true; document.body.classList.remove("v3d"); $("b3d").setAttribute("aria-pressed", "false");
     map.invalidateSize({ pan: false }); if (set3d.v) map.setView(set3d.v.c, set3d.v.z, { animate: false });   // 2D view exactly as left
   }
 }
 $("b3d").onclick = () => set3d(!on3d);
+// 3D camera controls: rotate ±30° per tap (hold = continuous), tilt ±10°, reset, orbit
+const ROT_STEP = 30, TILT_STEP = 10;
+let orbitOn = false, orbitRaf = 0, holdT = 0, holdRaf = 0;
+let rotTo = null, tiltTo = null;   // targets, so quick repeated taps add up instead of restarting from mid-animation
+function rot3d(d) { if (!m3) return; stopOrbit(); rotTo = (m3.isEasing() && rotTo != null ? rotTo : m3.getBearing()) + d; m3.easeTo({ bearing: rotTo, duration: 350 }) }
+function tilt3d(d) { if (!m3) return; tiltTo = Math.max(0, Math.min(m3.getMaxPitch(), (m3.isEasing() && tiltTo != null ? tiltTo : m3.getPitch()) + d)); m3.easeTo({ pitch: tiltTo, duration: 300 }) }
+function reset3d() { if (!m3) return; stopOrbit(); const c = m3.getCenter(); m3.easeTo({ bearing: 0, pitch: isDesktop() ? 60 : 50, center: c, duration: 500 }) }
+function routeCentre() { const P = SC.pts; if (P.length < 2) return m3.getCenter(); let a = 90, b = -90, x = 180, y = -180; for (const p of P) { a = Math.min(a, p[0]); b = Math.max(b, p[0]); x = Math.min(x, p[1]); y = Math.max(y, p[1]) } return [(x + y) / 2, (a + b) / 2] }
+function stopOrbit() { if (!orbitOn) return; orbitOn = false; cancelAnimationFrame(orbitRaf); $("c3Orbit").setAttribute("aria-pressed", "false"); $("c3Orbit").innerHTML = icon("i-play") }
+function toggleOrbit() {
+  if (!m3) return; if (orbitOn) return stopOrbit();
+  orbitOn = true; $("c3Orbit").setAttribute("aria-pressed", "true"); $("c3Orbit").innerHTML = icon("i-pause");
+  m3.easeTo({ center: routeCentre(), duration: 600 });
+  let t0 = 0; const step = t => { if (!orbitOn) return; if (t0 && !m3.isEasing()) m3.setBearing(m3.getBearing() + (t - t0) * .006); t0 = t; orbitRaf = requestAnimationFrame(step) };   // ~6°/s
+  setTimeout(() => { orbitRaf = requestAnimationFrame(step) }, 650);
+}
+function holdRot(btn, dir) {
+  let b0 = 0, ts = 0;
+  const end = () => { clearTimeout(holdT); cancelAnimationFrame(holdRaf); if (ts) { m3.setBearing(b0 + dir * (performance.now() - ts) * .09); ts = 0 } };   // ~90°/s while held
+  btn.addEventListener("pointerdown", e => {
+    if (e.button) return; btn.setPointerCapture(e.pointerId); stopOrbit(); clearTimeout(holdT); cancelAnimationFrame(holdRaf);
+    holdT = setTimeout(() => { btn.dataset.held = "1"; m3.stop(); b0 = m3.getBearing(); ts = performance.now(); const step = () => { if (!ts) return; m3.setBearing(b0 + dir * (performance.now() - ts) * .09); holdRaf = requestAnimationFrame(step) }; holdRaf = requestAnimationFrame(step) }, 350);
+  });
+  btn.addEventListener("pointerup", end); btn.addEventListener("pointercancel", end); btn.addEventListener("lostpointercapture", end);
+  btn.addEventListener("click", () => { if (btn.dataset.held) return delete btn.dataset.held; rot3d(dir * ROT_STEP) });
+}
+holdRot($("c3L"), -1); holdRot($("c3R"), 1);
+$("c3Up").onclick = () => tilt3d(TILT_STEP); $("c3Dn").onclick = () => tilt3d(-TILT_STEP); $("c3Reset").onclick = reset3d; $("c3Orbit").onclick = toggleOrbit;
+L.DomEvent.disableClickPropagation($("ctl3d"));
 // wiring
 $("mSnap").onclick = () => setMode("snap"); $("mFree").onclick = () => setMode("free"); $("mWpt").onclick = () => setMode("wpt");
 $("undo").onclick = undo; $("ret").onclick = returnPath; $("clear").onclick = clearRoute; $("exp").onclick = exportGpx;
@@ -1252,4 +1283,4 @@ load(); updLegend(); render(); renderW(); updHint(); renderLib();
 if (segs.some(s => s.mode === "snap" && !s.fallback && s.cv !== CUE_VER)) rebuildCues(); else updJoins();
 if (eleWarn || allPts().some(p => p[2] == null)) backfillAll();
 
-window.TP = { set3d, m3: () => m3, on3d: () => on3d, folders: () => folders, newFolder, renameFolder, delFolder, moveRoute, saveDialog, doSave, libSave, openRoute, renameRoute, delRoute, dupRoute, newRoute, openLib, lib: () => lib, junctionAt, routeArms, angDiff, osmNodes, classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
+window.TP = { rot3d, tilt3d, reset3d, toggleOrbit, set3d, m3: () => m3, on3d: () => on3d, folders: () => folders, newFolder, renameFolder, delFolder, moveRoute, saveDialog, doSave, libSave, openRoute, renameRoute, delRoute, dupRoute, newRoute, openLib, lib: () => lib, junctionAt, routeArms, angDiff, osmNodes, classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests

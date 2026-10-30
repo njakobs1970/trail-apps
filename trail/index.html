@@ -53,6 +53,13 @@
   <symbol id="i-save" viewBox="0 0 24 24"><path d="M5.5 3.5h10l3 3v12a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-13a2 2 0 0 1 2-2z"/><path d="M8 3.5v5h7v-5M8 20.5v-6h8v6"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12.5 4.5 4.5L19 7.5"/></symbol>
   <symbol id="i-folderplus" viewBox="0 0 24 24"><path d="M3.5 7.5A2 2 0 0 1 5.5 5.5h4l2 2.2h7a2 2 0 0 1 2 2v8.3a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 11v6M9 14h6"/></symbol>
+  <symbol id="i-rotl" viewBox="0 0 24 24"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 3.5v4h4"/></symbol>
+  <symbol id="i-rotr" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3"/><path d="M19.5 3.5v4h-4"/></symbol>
+  <symbol id="i-tiltup" viewBox="0 0 24 24"><path d="M4 18.5h16M7 14.5l5-9 5 9"/></symbol>
+  <symbol id="i-tiltdn" viewBox="0 0 24 24"><path d="M4 18.5h16M6 14.5h12"/><path d="M9 10.5l3-5 3 5"/></symbol>
+  <symbol id="i-north" viewBox="0 0 24 24"><path d="M12 3.5 17.5 20 12 16.5 6.5 20z"/></symbol>
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13l10-6.5z"/></symbol>
+  <symbol id="i-pause" viewBox="0 0 24 24"><path d="M8.5 5.5v13M15.5 5.5v13"/></symbol>
   <symbol id="i-keyboard" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2.5"/><path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M7.5 14h9"/></symbol>
  </defs>
 </svg>
@@ -70,6 +77,14 @@
 <div id="mapCtl" class="mapctl">
  <div class="ctl-group">
   <button id="b3d" class="ctl t3d" aria-pressed="false" aria-label="3D terrain view" data-tip="3D terrain  3">3D</button>
+ </div>
+ <div id="ctl3d" class="ctl-group ctl3d" role="group" aria-label="3D camera">
+  <button id="c3L" class="ctl" aria-label="Rotate left" data-tip="Rotate left  [  (hold to spin)"><svg class="ic"><use href="#i-rotl"/></svg></button>
+  <button id="c3R" class="ctl" aria-label="Rotate right" data-tip="Rotate right  ]  (hold to spin)"><svg class="ic"><use href="#i-rotr"/></svg></button>
+  <button id="c3Up" class="ctl" aria-label="Tilt up" data-tip="Tilt up  ↑"><svg class="ic"><use href="#i-tiltup"/></svg></button>
+  <button id="c3Dn" class="ctl" aria-label="Tilt down (flatter)" data-tip="Tilt down  ↓"><svg class="ic"><use href="#i-tiltdn"/></svg></button>
+  <button id="c3Reset" class="ctl" aria-label="Reset north and tilt" data-tip="Reset view  N"><svg class="ic"><use href="#i-north"/></svg></button>
+  <button id="c3Orbit" class="ctl" aria-pressed="false" aria-label="Orbit around route" data-tip="Orbit  K"><svg class="ic"><use href="#i-play"/></svg></button>
  </div>
  <div class="ctl-group">
   <button id="layersBtn" class="ctl" aria-label="Map style" aria-haspopup="true" aria-expanded="false" data-tip="Map style"><svg class="ic"><use href="#i-layers"/></svg></button>
@@ -199,6 +214,10 @@
    <dt><kbd>P</kbd></dt><dd>Show/hide elevation profile</dd>
    <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Move along the route (hold <kbd>Shift</kbd> for 500 m)</dd>
    <dt><kbd>3</kbd></dt><dd>3D terrain view on/off</dd>
+   <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>3D: rotate left / right</dd>
+   <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>3D: tilt up / down</dd>
+   <dt><kbd>N</kbd></dt><dd>3D: reset north and tilt</dd>
+   <dt><kbd>K</kbd></dt><dd>3D: orbit around the route</dd>
    <dt><kbd>L</kbd></dt><dd>Go to my location</dd>
    <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Zoom</dd>
    <dt><kbd>Esc</kbd></dt><dd>Hide marker / close panels</dd>
