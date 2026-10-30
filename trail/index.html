@@ -59,6 +59,7 @@
 
 <div id="map" role="application" aria-label="Map. Click to add route points."></div>
 
+<div id="map3d" hidden aria-label="3D terrain view (view only). Drag to pan, right-drag or two fingers to rotate and tilt."></div>
 <div id="wmark" class="wmark" aria-hidden="true">Trail Planner <span>by GrokBot</span></div>
 <div id="hint" class="hint" role="status" aria-live="polite" hidden>
  <svg class="ic"><use href="#i-snap"/></svg><span id="hintText">Click the map to start your route</span>
@@ -67,6 +68,9 @@
 
 <!-- Map controls (top right): layers, locate, zoom -->
 <div id="mapCtl" class="mapctl">
+ <div class="ctl-group">
+  <button id="b3d" class="ctl t3d" aria-pressed="false" aria-label="3D terrain view" data-tip="3D terrain  3">3D</button>
+ </div>
  <div class="ctl-group">
   <button id="layersBtn" class="ctl" aria-label="Map style" aria-haspopup="true" aria-expanded="false" data-tip="Map style"><svg class="ic"><use href="#i-layers"/></svg></button>
  </div>
@@ -194,6 +198,7 @@
    <dt><kbd>C</kbd></dt><dd>Switch Elevation / Cue sheet</dd>
    <dt><kbd>P</kbd></dt><dd>Show/hide elevation profile</dd>
    <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Move along the route (hold <kbd>Shift</kbd> for 500 m)</dd>
+   <dt><kbd>3</kbd></dt><dd>3D terrain view on/off</dd>
    <dt><kbd>L</kbd></dt><dd>Go to my location</dd>
    <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Zoom</dd>
    <dt><kbd>Esc</kbd></dt><dd>Hide marker / close panels</dd>

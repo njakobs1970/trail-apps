@@ -571,7 +571,7 @@ function render() {
   $("eMax").innerHTML = isFinite(hi) ? `${Math.round(hi)} <small>m</small>` : "–";
   $("eTime").textContent = dist > 0 ? fmtDur(naismith(dist, cs.total, pace)) : "–";
   $("exp").disabled = pts.length < 2; $("undo").disabled = !anchors.length; $("ret").disabled = anchors.length < 2; $("saveBtn").disabled = $("saveBtn2").disabled = !anchors.length && !wpts.length;
-  drawProfile(prof); renderCues();
+  drawProfile(prof); renderCues(); if (on3d) upd3d();
 }
 let renderQueued = false;
 const renderSoon = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render() }) };
@@ -669,12 +669,13 @@ const canHover = matchMedia("(hover:hover) and (pointer:fine)").matches;
 function scrubUpdate() {
   const s = scrubState(SC.pos), row = $("scrubRow");
   if (!s) {
-    if (SC.mk) { map.removeLayer(SC.mk); SC.mk = null } SC.pos = null;
+    if (SC.mk) { map.removeLayer(SC.mk); SC.mk = null } SC.pos = null; if (on3d) upd3d();
     row.innerHTML = SC.pts.length < 2 ? "" : `<span class="mut">${canHover ? "Move along the profile or hover the route to explore" : "Drag along the profile or tap the route"}</span>`;
     drawProfile(SC.prof); return;
   }
   if (!SC.mk) SC.mk = L.marker(s.ll, { interactive: false, keyboard: false, zIndexOffset: 2000, icon: L.divIcon({ className: "", html: '<div class="scrubDot"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }) }).addTo(map);
   else SC.mk.setLatLng(s.ll);
+  if (on3d) upd3d();
   const ele = s.ele == null ? "– m (no data)" : Math.round(s.ele) + " m" + (s.interp ? "*" : "");
   row.innerHTML =
     `<span class="rv lead"><b id="scD">${fmtKm(s.d)}</b><small>from start</small></span>` +
@@ -944,6 +945,7 @@ function setBase(key) {
   if (baseLayer) map.removeLayer(baseLayer);
   baseLayer = L.tileLayer(def.url, { maxZoom: 19, maxNativeZoom: def.max, attribution: def.attr, subdomains: def.sub || "abc", keepBuffer: 3, detectRetina: false }).addTo(map);
   store.set(KEY.layer, key); renderLayers(key);
+  if (m3 && m3.getSource("base")) { const bt = baseTiles(key); m3.getSource("base").setTiles(bt.tiles) }
 }
 function renderLayers(cur) {
   const p = $("layersPop");
@@ -974,13 +976,88 @@ addEventListener("keydown", e => {
   const act = {
     s: () => setMode("snap"), f: () => setMode("free"), w: () => setMode("wpt"), e: exportGpx, i: () => $("impFile").click(),
     g: () => setGrade(!gOn), c: () => setTab(tab === "cues" ? "ele" : "cues"), p: () => setPanel(!document.body.classList.contains("pcol")), l: () => map.locate({ enableHighAccuracy: true }),
-    "+": () => map.zoomIn(), "=": () => map.zoomIn(), "-": () => map.zoomOut(), "?": () => $("help").showModal(),
+    "3": () => set3d(!on3d), "+": () => on3d ? m3.zoomIn() : map.zoomIn(), "=": () => on3d ? m3.zoomIn() : map.zoomIn(), "-": () => on3d ? m3.zoomOut() : map.zoomOut(), "?": () => $("help").showModal(),
     ArrowRight: SC.pts.length > 1 ? () => stepScrub(1, e.shiftKey) : null, ArrowLeft: SC.pts.length > 1 ? () => stepScrub(-1, e.shiftKey) : null,
     Escape: () => { toggleLayers(false); if (document.body.classList.contains("libopen")) return openLib(false); if (SC.pos != null) setScrub(null); else if ($("wpts").classList.contains("open")) openWpts(false) },
   }[k];
   if (!act) return;
   e.preventDefault(); act();
 });
+
+/* 11b. 3D terrain view (view-only) -------------------------------------------------
+ * MapLibre GL is loaded from the CDN on first use. Terrain: AWS Terrarium DEM tiles. Base: the current
+ * Leaflet basemap as a raster source. Leaflet stays the editor and is never moved, so 2D comes back as it was. */
+const ML_VER = "4.7.1", ML_CDN = `https://unpkg.com/maplibre-gl@${ML_VER}/dist/`;
+let m3 = null, on3d = false, m3Wmk = [];
+const hasGL = () => { try { const c = document.createElement("canvas"); return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl"))) } catch (e) { return false } };
+function loadML() {
+  if (window.maplibregl) return Promise.resolve();
+  if (loadML.p) return loadML.p;
+  return loadML.p = new Promise((ok, no) => {
+    const l = document.createElement("link"); l.rel = "stylesheet"; l.href = ML_CDN + "maplibre-gl.css"; document.head.appendChild(l);
+    const sc = document.createElement("script"); sc.src = ML_CDN + "maplibre-gl.js"; sc.onload = ok; sc.onerror = () => { loadML.p = null; no(new Error("MapLibre failed to load")) }; document.head.appendChild(sc);
+  });
+}
+function baseTiles(key) {
+  const d = BASEMAPS[key] || BASEMAPS.topo, sub = (d.sub || "abc").split("");
+  const u = d.url.replace("{r}", ""); return { tiles: u.includes("{s}") ? sub.map(x => u.replace("{s}", x)) : [u], maxzoom: d.max, attribution: d.attr };
+}
+function route3dData() {
+  const P = SC.pts, G = SC.gr, f = [];
+  if (P.length > 1) {
+    if (gOn) { let st = 0; for (let i = 1; i <= P.length; i++) if (i === P.length || gBand(G[i]) !== gBand(G[st + 1])) { if (i - 1 > st) f.push({ type: "Feature", properties: { c: gCol(G[st + 1]) }, geometry: { type: "LineString", coordinates: P.slice(st, i).map(p => [p[1], p[0]]) } }); st = i - 1 } }
+    else segs.forEach(s => { if (s.pts.length > 1) f.push({ type: "Feature", properties: { c: segColor(s) }, geometry: { type: "LineString", coordinates: s.pts.map(p => [p[1], p[0]]) } }) });
+  }
+  return { type: "FeatureCollection", features: f };
+}
+function upd3d() {
+  if (!m3 || !m3.isStyleLoaded() || !m3.getSource("route")) return;
+  m3.getSource("route").setData(route3dData());
+  const s = SC.pos != null ? scrubState(SC.pos) : null;
+  m3.getSource("scrub").setData({ type: "FeatureCollection", features: s ? [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [s.ll[1], s.ll[0]] } }] : [] });
+  m3Wmk.forEach(m => m.remove()); m3Wmk = wpts.map(w => { const e = document.createElement("div"); e.className = "w3d"; e.title = w.name || wType(w.type).label; const t = wType(w.type); e.style.background = t.color || ""; e.innerHTML = icon(t.icon || "i-flag"); return new maplibregl.Marker({ element: e, anchor: "bottom" }).setLngLat([w.lng, w.lat]).addTo(m3) });
+}
+function fit3d() {
+  const P = SC.pts.length > 1 ? SC.pts : null, pitch = isDesktop() ? 60 : 50;
+  const c = map.getCenter();
+  if (!P) return m3.jumpTo({ center: [c.lng, c.lat], zoom: Math.max(1, map.getZoom() - 1), pitch, bearing: 0 });
+  let a = 90, b = -90, x = 180, y = -180; for (const p of P) { a = Math.min(a, p[0]); b = Math.max(b, p[0]); x = Math.min(x, p[1]); y = Math.max(y, p[1]) }
+  const ui = $("ui").getBoundingClientRect(), dk = isDesktop();
+  m3.fitBounds([[x, a], [y, b]], { pitch, bearing: m3.getBearing(), duration: 0, maxZoom: 16, padding: dk ? { top: 60, bottom: 260, left: 380, right: 70 } : { top: 60, bottom: Math.min(ui.height, innerHeight * .5) + 20, left: 30, right: 60 } });
+}
+async function set3d(on) {
+  if (on === on3d) return;
+  if (on) {
+    if (!hasGL()) return toast("3D needs WebGL, which isn't available in this browser");
+    $("b3d").classList.add("busy3d");
+    try { await loadML() } catch (e) { $("b3d").classList.remove("busy3d"); return toast("Couldn't load the 3D map – check your connection") }
+    $("b3d").classList.remove("busy3d");
+    set3d.v = { c: map.getCenter(), z: map.getZoom() };
+    const el = $("map3d"); el.hidden = false; on3d = true; document.body.classList.add("v3d"); $("b3d").setAttribute("aria-pressed", "true");
+    if (!m3) {
+      const bt = baseTiles(store.get(KEY.layer, "topo"));
+      m3 = new maplibregl.Map({
+        container: el, attributionControl: { compact: true }, maxPitch: isDesktop() ? 80 : 60, pitch: 60, center: [map.getCenter().lng, map.getCenter().lat], zoom: map.getZoom() - 1,
+        style: { version: 8, sources: {
+          base: { type: "raster", tiles: bt.tiles, tileSize: 256, maxzoom: bt.maxzoom, attribution: bt.attribution },
+          dem: { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 15, encoding: "terrarium", attribution: "Terrain: Mapzen / AWS Terrain Tiles" },
+          route: { type: "geojson", data: { type: "FeatureCollection", features: [] } }, scrub: { type: "geojson", data: { type: "FeatureCollection", features: [] } } },
+          layers: [{ id: "base", type: "raster", source: "base" },
+            { id: "hills", type: "hillshade", source: "dem", paint: { "hillshade-exaggeration": .25, "hillshade-shadow-color": "rgba(0,0,0,.35)" } },
+            { id: "route-case", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": "#fff", "line-width": 8 } },
+            { id: "route-line", type: "line", source: "route", layout: { "line-cap": "round", "line-join": "round" }, paint: { "line-color": ["get", "c"], "line-width": 4.5 } },
+            { id: "scrub", type: "circle", source: "scrub", paint: { "circle-radius": 7, "circle-color": "#0071e3", "circle-stroke-color": "#fff", "circle-stroke-width": 3 } }],
+          terrain: { source: "dem", exaggeration: 1.4 }, sky: {} },
+      });
+      m3.addControl(new maplibregl.NavigationControl({ visualizePitch: true, showZoom: false }), "bottom-right");
+      m3.on("load", () => { upd3d(); fit3d() });
+    } else { m3.resize(); upd3d(); fit3d() }
+  } else {
+    on3d = false; $("map3d").hidden = true; document.body.classList.remove("v3d"); $("b3d").setAttribute("aria-pressed", "false");
+    map.invalidateSize({ pan: false }); if (set3d.v) map.setView(set3d.v.c, set3d.v.z, { animate: false });   // 2D view exactly as left
+  }
+}
+$("b3d").onclick = () => set3d(!on3d);
 // wiring
 $("mSnap").onclick = () => setMode("snap"); $("mFree").onclick = () => setMode("free"); $("mWpt").onclick = () => setMode("wpt");
 $("undo").onclick = undo; $("ret").onclick = returnPath; $("clear").onclick = clearRoute; $("exp").onclick = exportGpx;
@@ -992,7 +1069,7 @@ $("gTog").onclick = () => setGrade(!gOn);
 $("tEle").onclick = () => setTab("ele"); $("tCue").onclick = () => setTab("cues");
 $("pTog").onclick = () => setPanel(!document.body.classList.contains("pcol"));
 $("loc").onclick = () => map.locate({ enableHighAccuracy: true });
-$("zIn").onclick = () => map.zoomIn(); $("zOut").onclick = () => map.zoomOut();
+$("zIn").onclick = () => on3d ? m3.zoomIn() : map.zoomIn(); $("zOut").onclick = () => on3d ? m3.zoomOut() : map.zoomOut();
 $("layersBtn").onclick = e => { e.stopPropagation(); toggleLayers() };
 $("helpBtn").onclick = () => $("help").showModal();
 $("pace").value = String(pace); if (!$("pace").value) { pace = NAISMITH_BASE_KMH; $("pace").value = "5" }
@@ -1175,4 +1252,4 @@ load(); updLegend(); render(); renderW(); updHint(); renderLib();
 if (segs.some(s => s.mode === "snap" && !s.fallback && s.cv !== CUE_VER)) rebuildCues(); else updJoins();
 if (eleWarn || allPts().some(p => p[2] == null)) backfillAll();
 
-window.TP = { folders: () => folders, newFolder, renameFolder, delFolder, moveRoute, saveDialog, doSave, libSave, openRoute, renameRoute, delRoute, dupRoute, newRoute, openLib, lib: () => lib, junctionAt, routeArms, angDiff, osmNodes, classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
+window.TP = { set3d, m3: () => m3, on3d: () => on3d, folders: () => folders, newFolder, renameFolder, delFolder, moveRoute, saveDialog, doSave, libSave, openRoute, renameRoute, delRoute, dupRoute, newRoute, openLib, lib: () => lib, junctionAt, routeArms, angDiff, osmNodes, classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests

@@ -419,3 +419,20 @@ body.libopen .hint{display:none!important}
 @media (max-width:899px){.btn.iconly{width:44px}.lf-t{height:46px}.lf-h .lacts{opacity:1}}
 @media (min-width:900px) and (hover:hover){.lrow .lacts{display:none}.lrow:hover .lacts,.lrow:focus-within .lacts{display:flex}}
 .sd-btns .btn{white-space:nowrap;padding:0 10px}
+
+/* 14. 3D view ------------------------------------------------------------------- */
+#map3d{position:absolute;inset:0;z-index:850;background:var(--bg)}
+.t3d{font-size:13px;font-weight:700;letter-spacing:-.02em}
+.t3d[aria-pressed="true"]{background:var(--accent);color:var(--accent-ink)}
+.t3d[aria-pressed="true"]:hover{background:var(--accent-h)}
+.t3d.busy3d{animation:pulse3d 1s ease-in-out infinite}
+@keyframes pulse3d{50%{opacity:.4}}
+body.v3d .hint{display:none!important}
+body.v3d #layersBtn{opacity:1}
+.w3d{width:28px;height:28px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:var(--accent);border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,.3);display:grid;place-items:center}
+.w3d .ic{width:15px;height:15px;color:#fff;transform:rotate(45deg)}
+#map3d .maplibregl-ctrl-group{background:var(--glass);border:1px solid var(--stroke);border-radius:12px;box-shadow:var(--shadow-s)}
+#map3d .maplibregl-ctrl-bottom-right{bottom:calc(var(--ph-desk) + 2*var(--gap));right:calc(var(--gap) - 10px)}
+#map3d .maplibregl-ctrl-attrib{background:var(--glass);color:var(--text2);font-size:10px}
+@media (max-width:899px){#map3d .maplibregl-ctrl-bottom-right{bottom:calc(64% + 6px)}}
+body.v3d #map .leaflet-control-container{visibility:hidden}
