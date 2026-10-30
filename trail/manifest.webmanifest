@@ -4,6 +4,7 @@
   "description": "Plan trail routes on real paths, explore the elevation profile and export GPX for your watch.",
   "start_url": "./",
   "scope": "./",
+  "id": "/trail-apps/trail/",
   "display": "standalone",
   "background_color": "#f5f5f7",
   "theme_color": "#0b7a55",
