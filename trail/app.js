@@ -248,6 +248,15 @@ function undo() {
   if (segs.length >= anchors.length && segs.length) segs.pop();
   render(); save(); updHint();
 }
+/** Out-and-back: append the route reversed so it returns to the start along the same path. */
+function returnPath() {
+  if (anchors.length < 2 || segs.length !== anchors.length - 1 || segs.some(s => !s.pts.length)) return toast("Finish drawing the route first");
+  for (let i = segs.length - 1; i >= 0; i--) {
+    const s = segs[i]; anchors.push({ ...anchors[i] }); addMarker(anchors.length - 1);
+    segs.push({ mode: s.mode, pts: s.pts.map(p => [...p]).reverse(), ...(s.fallback ? { fallback: true } : {}) });
+  }
+  render(); save(); updHint(); toast("Return leg added – Undo removes it a point at a time");
+}
 function clearRoute() {
   if (anchors.length && !confirm("Clear the whole route?")) return;
   anchors = []; segs = []; markers.forEach(m => map.removeLayer(m)); markers = [];
@@ -349,7 +358,7 @@ function render() {
   $("eMin").innerHTML = isFinite(lo) ? `${Math.round(lo)} <small>m</small>` : "–";
   $("eMax").innerHTML = isFinite(hi) ? `${Math.round(hi)} <small>m</small>` : "–";
   $("eTime").textContent = dist > 0 ? fmtDur(naismith(dist, cs.total, pace)) : "–";
-  $("exp").disabled = pts.length < 2; $("undo").disabled = !anchors.length;
+  $("exp").disabled = pts.length < 2; $("undo").disabled = !anchors.length; $("ret").disabled = anchors.length < 2;
   drawProfile(prof);
 }
 let renderQueued = false;
@@ -712,6 +721,7 @@ addEventListener("keydown", e => {
   if ($("help").open) return;
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return }
+  if (!mod && e.key.toLowerCase() === "r") { e.preventDefault(); returnPath(); return }
   if (mod || e.altKey) return;
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const act = {
@@ -726,7 +736,7 @@ addEventListener("keydown", e => {
 });
 // wiring
 $("mSnap").onclick = () => setMode("snap"); $("mFree").onclick = () => setMode("free"); $("mWpt").onclick = () => setMode("wpt");
-$("undo").onclick = undo; $("clear").onclick = clearRoute; $("exp").onclick = exportGpx;
+$("undo").onclick = undo; $("ret").onclick = returnPath; $("clear").onclick = clearRoute; $("exp").onclick = exportGpx;
 $("wList").onclick = () => openWpts(!$("wpts").classList.contains("open"));
 $("imp").onclick = () => $("impFile").click();
 $("impFile").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; try { await importGpx(await f.text()) } catch (err) { toast("Could not read GPX: " + err.message, 5000) } };

@@ -26,6 +26,7 @@
   <symbol id="i-snap" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.9-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 15.1 12 21 12 21z"/><circle cx="12" cy="9.8" r="2.4"/></symbol>
   <symbol id="i-free" viewBox="0 0 24 24"><path d="M3.5 17.5c2.5-5 4.6-5.2 6 -2.2s3.6 2.6 5.2-1.8 3.4-5.8 5.8-4.5"/><path d="M17.5 4.5l2 2"/></symbol>
   <symbol id="i-flag" viewBox="0 0 24 24"><path d="M5.5 21V4"/><path d="M5.5 4.5h11.5l-2.2 4 2.2 4H5.5"/></symbol>
+  <symbol id="i-return" viewBox="0 0 24 24"><path d="M7 7h10l-3-3"/><path d="M17 17H7l3 3"/></symbol>
   <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14.5 4 9.5l5-5"/><path d="M4 9.5h10.5a5.5 5.5 0 0 1 0 11H11"/></symbol>
   <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l.9 12.2a1.5 1.5 0 0 0 1.5 1.3h6.2a1.5 1.5 0 0 0 1.5-1.3L17.5 7"/><path d="M10.2 11v5.5M13.8 11v5.5"/></symbol>
   <symbol id="i-export" viewBox="0 0 24 24"><path d="M12 3.5v11"/><path d="m7.5 10 4.5 4.5 4.5-4.5"/><path d="M5 19.5h14"/></symbol>
@@ -98,6 +99,7 @@
 
   <div class="actions">
    <button id="undo" class="btn" aria-label="Undo last point" data-tip="Undo  ⌘Z / Ctrl+Z"><svg class="ic"><use href="#i-undo"/></svg><span>Undo</span></button>
+   <button id="ret" class="btn" aria-label="Add return path" data-tip="Return to start  R"><svg class="ic"><use href="#i-return"/></svg><span>Return</span></button>
    <button id="clear" class="btn" aria-label="Clear route" data-tip="Clear route"><svg class="ic"><use href="#i-trash"/></svg><span>Clear</span></button>
    <button id="imp" class="btn" aria-label="Import GPX" data-tip="Import GPX  I"><svg class="ic"><use href="#i-import"/></svg><span>Import</span></button>
    <button id="wList" class="btn" aria-label="Waypoints" aria-expanded="false" data-tip="Waypoint list"><svg class="ic"><use href="#i-list"/></svg><span class="wl-t">Waypoints</span><span class="badge" id="wCount">0</span></button>
@@ -146,6 +148,7 @@
    <dt><kbd>F</kbd></dt><dd>Freehand mode: drag to draw</dd>
    <dt><kbd>W</kbd></dt><dd>Waypoint mode</dd>
    <dt><kbd>⌘</kbd><kbd>Z</kbd> / <kbd>Ctrl</kbd><kbd>Z</kbd></dt><dd>Undo last point</dd>
+   <dt><kbd>R</kbd></dt><dd>Add return path</dd>
    <dt><kbd>E</kbd></dt><dd>Export GPX</dd>
    <dt><kbd>I</kbd></dt><dd>Import GPX</dd>
    <dt><kbd>G</kbd></dt><dd>Colour route by grade on/off</dd>
