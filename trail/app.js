@@ -11,7 +11,7 @@
  * Route model: anchors[i] = {lat,lng}; segs[i] joins anchors[i] -> anchors[i+1]
  *   seg = {mode:'snap'|'free', pts:[[lat,lng,ele|null]], fallback?, imported?, cues?:[{i,t}]}
  *   cues: BRouter junction hints, i = index into seg.pts, t = VoiceHint code (TL, KR, C …).
- *   Missing cues on an old saved snap leg are rebuilt lazily (rebuildCues).
+ *   Cues come from OSM junctions (updJoins); legs saved with an older cue version are recomputed on load.
  * State (anchors, segs, wpts, mode, pending, map ...) is deliberately top-level so the
  * headless tests can inspect it; window.TP exposes the pure helpers.
  */
@@ -217,7 +217,7 @@ async function route(a, b, quiet) {
  * Leg joins get a cue only when the route really turns there (>= JOIN_TURN_DEG). */
 const VH = { 1: "C", 2: "TL", 3: "TSLL", 4: "TSHL", 5: "TR", 6: "TSLR", 7: "TSHR", 8: "KL", 9: "KR", 10: "TU", 11: "TU", 13: "RNDB", 14: "RNDB", 15: "TU", 17: "KL", 18: "KR" };
 const CUE = {
-  C: { txt: "Straight on at junction", ab: "S", sym: "Straight", ic: "c-straight" },
+  C: { txt: "Straight on", ab: "S", sym: "Straight", ic: "c-straight" },
   TL: { txt: "Turn left", ab: "L", sym: "Left", ic: "c-left" }, TR: { txt: "Turn right", ab: "R", sym: "Right", ic: "c-right" },
   TSLL: { txt: "Bear left", ab: "BL", sym: "Slight Left", ic: "c-sleft" }, TSLR: { txt: "Bear right", ab: "BR", sym: "Slight Right", ic: "c-sright" },
   TSHL: { txt: "Sharp left", ab: "SHL", sym: "Sharp Left", ic: "c-shleft" }, TSHR: { txt: "Sharp right", ab: "SHR", sym: "Sharp Right", ic: "c-shright" },
@@ -226,12 +226,18 @@ const CUE = {
   START: { txt: "Start", ab: "Start", sym: "Flag, Green", ic: "c-start" }, END: { txt: "Finish", ab: "Finish", sym: "Flag, Red", ic: "c-end" },
 };
 const FLIP = { TL: "TR", TR: "TL", TSLL: "TSLR", TSLR: "TSLL", TSHL: "TSHR", TSHR: "TSHL", KL: "KR", KR: "KL", C: "C", TU: "TU", RNDB: "RNDB" };
-const CUE_DEDUP_M = 40, JOIN_TURN_DEG = 150, JOIN_ARM_M = 30;
+const CUE_DEDUP_M = 25, JOIN_TURN_DEG = 150, JOIN_ARM_M = 30;
 let cuesOn = store.get(KEY.cues) !== "off";
 /** Strict junction test on one raw BRouter voicehint [idx, cmd, exit, distNext, angle, geometry].
  *  geometry = " inPrio(outAngle)outPrio (altAngle)altPrio …": every other way leaving that node, with the
  *  profile's priority class (2–6 path, 8–10 track, 12–14 service, 16 steps, 18+ roads). Negative angle = left.
  *  Returns a cue code, or null when the route just follows the obvious path. */
+const angCode = d => { const a = Math.abs(d); return a < 20 ? "C" : a < 45 ? (d < 0 ? "TSLL" : "TSLR") : a <= 120 ? (d < 0 ? "TL" : "TR") : (d < 0 ? "TSHL" : "TSHR") };
+/** Fallback (Overpass down): any BRouter hint listing at least one other way is a junction. */
+function hintJunction(h) {
+  const m = String(h[5] || "").trim().match(/^(-?\d+)\((-?\d+)\)(-?\d+)(.*)$/); if (!m || !/\(/.test(m[4])) return null;
+  return angCode(+m[2]);
+}
 function classifyHint(h) {
   if (h[1] === 13 || h[1] === 14) return "RNDB";
   const m = String(h[5] || "").trim().match(/^(-?\d+)\((-?\d+)\)(-?\d+)(.*)$/); if (!m) return null;
@@ -248,10 +254,10 @@ function classifyHint(h) {
   const cross = w => Math.abs(w.a) >= 45 && (w.p >= 16 || (w.p >= 8 && w.p > inP));
   return sig.some(x => cross(x) && x.a < 0) && sig.some(x => cross(x) && x.a > 0) ? "C" : null;
 }
-const CUE_VER = 2;     // bump to recompute cues stored by older versions
+const CUE_VER = 3;     // bump to recompute cues stored by older versions
 function parseHints(vh, n) {
   if (!Array.isArray(vh)) return [];
-  return vh.map(h => ({ i: +h[0], t: classifyHint(h) })).filter(c => c.t && c.i > 0 && c.i < n - 1);
+  return vh.map(h => ({ i: +h[0], t: hintJunction(h) })).filter(c => c.t && c.i > 0 && c.i < n - 1);
 }
 /** Junction at a join between two snapped legs: BRouter gives no hint at a via point, so route a short
  *  probe from ~60 m before to ~60 m after the join and keep a hint that lands on it. Cached per join. */
@@ -265,23 +271,102 @@ async function joinCue(prev, s) {
   const c = r.fallback ? null : r.cues.find(c => hav(r.pts[c.i], J) < 15);
   const t = c ? c.t : null; if (!r.fallback) joinCache.set(k, t); return t;
 }
-async function updJoins() {
-  let ch = false;
-  for (let j = 1; j < segs.length; j++) {
-    const p = segs[j - 1], s = segs[j];
-    if (s.mode !== "snap" || p.mode !== "snap" || s.fallback || p.fallback || !s.pts.length || !p.pts.length) { if (s.jc) { delete s.jc; ch = true } continue }
-    const key = eleKey(p.pts.at(-2) || p.pts[0]) + eleKey(s.pts[0]) + eleKey(s.pts[1] || s.pts[0]);
-    if (s.jk === key) continue;
-    const t = await joinCue(p, s); if (segs[j] !== s) continue; s.jc = t; s.jk = key; ch = true;
+/* Junctions from OpenStreetMap (Overpass): BRouter's output points are OSM nodes, so at each route
+ * point we look up every highway way through that node. Any way leaving that is not the route's own
+ * in/out edge (and not service=driveway, not a duplicate bearing) makes it a junction -> one cue,
+ * with the direction from the route's turn angle. Bends without another way never match. */
+const OVERPASS = ["https://overpass-api.de/api/interpreter"], OSM_API = "https://api.openstreetmap.org/api/0.6/map.json";
+const TILE = .01, osmTiles = new Map(), osmNodes = new Map();   // tile -> Promise<bool>; "lat,lng"(5dp) -> [{lat,lng,adj:[[lat,lng,kind]]}]
+const NOT_WAY = /^(proposed|construction|platform|bus_stop|elevator|corridor|abandoned|razed|raceway|rest_area|services)$/;
+const wayKind = t => /^(path|footway|steps|bridleway|cycleway|pedestrian)$/.test(t.highway) ? "path" : t.highway === "track" ? "track" : "road";
+function osmTile(k) {
+  if (osmTiles.has(k)) return osmTiles.get(k);
+  const [y, x] = k.split(",").map(Number), bb = [y * TILE, x * TILE, (y + 1) * TILE, (x + 1) * TILE].map(v => v.toFixed(4)).join(",");
+  const q = `[out:json][timeout:25];way["highway"](${bb});out body geom;`;
+  const pr = (async () => {
+    const srcs = [...OVERPASS.map(u => () => getJSON(u, { method: "POST", body: "data=" + encodeURIComponent(q), headers: { "Content-Type": "application/x-www-form-urlencoded" } }, 1)),
+      // fallback: the main OSM API map call (CORS-enabled), converted to the same {tags, geometry} shape
+      async () => {
+        const j = await getJSON(`${OSM_API}?bbox=${[x * TILE, y * TILE, (x + 1) * TILE, (y + 1) * TILE].map(v => v.toFixed(4)).join(",")}`, { headers: { Accept: "application/json" } }, 2);
+        if (!j || !Array.isArray(j.elements)) return null;
+        const N = new Map(); j.elements.forEach(e => { if (e.type === "node") N.set(e.id, e) });
+        return { elements: j.elements.filter(e => e.type === "way" && e.tags && e.tags.highway).map(e => { const ns = e.nodes.filter(id => N.has(id)); return { tags: e.tags, nodes: ns, geometry: ns.map(id => ({ lat: N.get(id).lat, lon: N.get(id).lon })) } }) };
+      }];
+    for (const get of srcs) {
+      const j = await get();
+      if (!j || !Array.isArray(j.elements)) continue;
+      for (const w of j.elements) {
+        const t = w.tags || {}, g = w.geometry; if (!g || g.length < 2 || NOT_WAY.test(t.highway) || t.service === "driveway" || t.area === "yes" || t.access === "private" && t.highway === "service") continue;
+        const kd = wayKind(t);
+        g.forEach((n, i) => {
+          const key = n.lat.toFixed(5) + "," + n.lon.toFixed(5); let L = osmNodes.get(key); if (!L) osmNodes.set(key, L = []);
+          const id = w.nodes ? w.nodes[i] : key;           // OSM node id: only ways that really share the node count
+          let nd = L.find(z => z.id === id); if (!nd) L.push(nd = { id, lat: n.lat, lng: n.lon, adj: [] });
+          for (const m of [g[i - 1], g[i + 1]]) if (m && !nd.adj.some(a => Math.abs(a[0] - m.lat) < 2e-6 && Math.abs(a[1] - m.lon) < 2e-6)) nd.adj.push([m.lat, m.lon, kd]);
+        });
+      }
+      return true;
+    }
+    osmTiles.delete(k); return false;                      // retry on a later scan
+  })();
+  osmTiles.set(k, pr); return pr;
+}
+function osmNodeAt(p) {
+  let best = null, bd = Infinity;
+  for (const dy of [-1e-5, 0, 1e-5]) for (const dx of [-1e-5, 0, 1e-5]) {
+    const L = osmNodes.get((p[0] + dy).toFixed(5) + "," + (p[1] + dx).toFixed(5)); if (!L) continue;
+    for (const z of L) { const d = hav([z.lat, z.lng], p); if (d < 1.5 && (!best || d < bd || d === bd && z.adj.length > best.adj.length)) { best = z; bd = d } }
   }
-  if (ch) { render(); save() }
+  return best;
+}
+const angDiff = (a, b) => ((a - b + 540) % 360) - 180;
+/** Junction cue at P[i] (in/out = neighbour route points), or null. */
+function junctionAt(P, cum, i) {
+  const n = osmNodeAt(P[i]); if (!n || n.adj.length < 2) return null;
+  const prev = P[i - 1], next = P[i + 1], bIn = bearing(prev, P[i]), bBack = bearing(P[i], prev), bOut = bearing(P[i], next);
+  const br = [];
+  for (const a of n.adj) {
+    if (hav(a, prev) < 2 || hav(a, next) < 2) continue;                      // the route's own edges
+    const b = bearing(P[i], a);
+    if (Math.abs(angDiff(b, bBack)) < 8 || Math.abs(angDiff(b, bOut)) < 8) continue;   // duplicate / overlapping geometry
+    if (br.some(x => Math.abs(angDiff(x.b, b)) < 8)) continue;
+    br.push({ b, rel: angDiff(b, bIn), kind: a[2] });
+  }
+  if (!br.length) return null;
+  const t = angCode(turnAt(P, cum, i, 15));
+  let x = "";
+  if (t === "C" || t === "TSLL" || t === "TSLR") {        // following the main way past a side way: say what branches off
+    const kind = br.some(z => z.kind === "road") ? "road" : br.some(z => z.kind === "track") ? "track" : "path";
+    const L = br.some(z => z.rel < -20 && z.rel > -160), R = br.some(z => z.rel > 20 && z.rel < 160);
+    x = L && R ? `${kind} crossing` : L ? `${kind} left` : R ? `${kind} right` : "";
+  }
+  return { t, x };
+}
+let jScan = 0;
+async function updJoins() {
+  const my = ++jScan, P = trackPts(); if (P.length < 3) return;
+  const tiles = new Set(); P.forEach(p => tiles.add(Math.floor(p[0] / TILE) + "," + Math.floor(p[1] / TILE)));
+  const ok = (await Promise.all([...tiles].map(osmTile))).every(Boolean);
+  if (my !== jScan || !ok) return;                        // superseded, or Overpass down: keep BRouter-hint cues
+  let d = 0; const cum = P.map((p, k) => k ? d += hav(P[k - 1], p) : 0);
+  let base = 0;
+  segs.forEach((s, j) => {
+    const n = s.pts.length; if (!n) return;
+    if (s.mode === "snap" && !s.fallback && !s.imported) {
+      const c = [];
+      for (let k = j ? 0 : 1; k < n - 1; k++) { const g = base + k; if (g <= 0 || g >= P.length - 1) continue; const r = junctionAt(P, cum, g); if (r) c.push({ i: k, ...r }) }
+      s.cues = c; s.cv = CUE_VER; delete s.jc; delete s.jk;
+    }
+    base += n - 1;
+  });
+  render(); save();
 }
 /** Cues of a leg travelled backwards: mirror indices, swap left/right. */
-const reverseCues = (cues, n) => (cues || []).map(c => ({ i: n - 1 - c.i, t: FLIP[c.t] || c.t })).reverse();
+const reverseCues = (cues, n) => (cues || []).map(c => ({ i: n - 1 - c.i, t: FLIP[c.t] || c.t, x: c.x && c.x.replace(/left|right/, m => m === "left" ? "right" : "left") })).reverse();
 function bearing(a, b) { const y = Math.sin((b[1] - a[1]) * RAD) * Math.cos(b[0] * RAD), x = Math.cos(a[0] * RAD) * Math.sin(b[0] * RAD) - Math.sin(a[0] * RAD) * Math.cos(b[0] * RAD) * Math.cos((b[1] - a[1]) * RAD); return Math.atan2(y, x) / RAD }
 /** Signed turn angle (deg, + = right) at P[i], measured over ~JOIN_ARM_M arms so GPS jitter is ignored. */
-function turnAt(P, cum, i) {
-  let a = i, b = i; while (a > 0 && cum[i] - cum[a] < JOIN_ARM_M) a--; while (b < P.length - 1 && cum[b] - cum[i] < JOIN_ARM_M) b++;
+function turnAt(P, cum, i, arm = JOIN_ARM_M) {
+  let a = i, b = i; while (a > 0 && cum[i] - cum[a] < arm) a--; while (b < P.length - 1 && cum[b] - cum[i] < arm) b++;
   if (a === i || b === i) return 0; let d = bearing(P[i], P[b]) - bearing(P[a], P[i]); d = ((d + 540) % 360) - 180; return d;
 }
 const turnCode = d => { const a = Math.abs(d); return a > 150 ? "TU" : a > 120 ? (d > 0 ? "TSHR" : "TSHL") : d > 0 ? "TR" : "TL" };
@@ -291,7 +376,7 @@ function buildCues(P = SC.pts, cum = SC.cum) {
   const raw = [{ g: 0, t: "START", pr: 3 }]; let base = 0;
   segs.forEach((s, j) => {
     const n = s.pts.length; if (!n) return;
-    (s.cues || []).forEach(c => { if (c.i > 0 && c.i < n - 1) raw.push({ g: base + c.i, t: c.t, pr: c.t === "C" ? 1 : 2 }) });
+    (s.cues || []).forEach(c => { if ((c.i > 0 || j > 0) && c.i < n - 1) raw.push({ g: base + c.i, t: c.t, x: c.x, pr: c.t === "C" ? 1 : /^TSL/.test(c.t) ? 1.5 : 2 }) });
     if (j > 0 && s.jc && base > 0) raw.push({ g: base, t: s.jc, pr: s.jc === "C" ? 1 : 2, join: true });
     base += n - 1;
     // out-and-back turnaround at a leg join (no junction needed)
@@ -307,21 +392,11 @@ function buildCues(P = SC.pts, cum = SC.cum) {
     out.push(c);
   }
   const fin = raw.at(-1); if (out.at(-1) !== fin) { if (out.length > 1 && fin.d - out.at(-1).d < CUE_DEDUP_M) out.pop(); out.push(fin) }
-  return out.map((c, k) => ({ d: c.d, ll: [P[c.g][0], P[c.g][1]], ele: P[c.g][2], t: c.t, txt: CUE[c.t].txt, next: k < out.length - 1 ? null : 0 }))
+  return out.map((c, k) => ({ d: c.d, ll: [P[c.g][0], P[c.g][1]], ele: P[c.g][2], t: c.t, txt: CUE[c.t].txt + (c.x ? ` (${c.x})` : ""), next: k < out.length - 1 ? null : 0 }))
     .map((c, k, a) => ({ ...c, next: k < a.length - 1 ? a[k + 1].d - c.d : 0 }));
 }
 /** Old saved snap legs have no cues: re-ask BRouter once and map its hints onto the stored points. */
-async function rebuildCues() {
-  for (const s of segs) {
-    if (s.mode !== "snap" || s.fallback || s.imported || (Array.isArray(s.cues) && s.cv === CUE_VER) || s.pts.length < 3) continue;
-    const r = await route({ lat: s.pts[0][0], lng: s.pts[0][1] }, { lat: s.pts.at(-1)[0], lng: s.pts.at(-1)[1] }, true);
-    if (r.fallback) continue;
-    s.cues = r.cues.map(c => { const q = r.pts[c.i]; let bi = 0, bd = Infinity; s.pts.forEach((p, k) => { const d = hav(p, q); if (d < bd) { bd = d; bi = k } }); return bd < 25 ? { i: bi, t: c.t } : null })
-      .filter(c => c && c.i > 0 && c.i < s.pts.length - 1);
-    s.cv = CUE_VER;
-  }
-  save(); render(); updJoins();
-}
+async function rebuildCues() { await updJoins() }   // old saved cues (cv < CUE_VER) are recomputed from OSM
 
 /* 5. Route editing & drawing --------------------------------------------------- */
 const map = L.map("map", { zoomControl: false, zoomSnap: .5, wheelPxPerZoomLevel: 90 }).setView(HOME, HOME_ZOOM);
