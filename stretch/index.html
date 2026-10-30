@@ -7,6 +7,9 @@
 <title>Stretch by Bot</title><link rel="stylesheet" href="style.css"></head><body>
 <section id="home">
  <header><h1>Stretch by Bot</h1><span><button id="testsBtn" class="ghost">Tests</button> <button id="histBtn" class="ghost">History</button></span></header>
+ <div class="card timebar"><div class="tb-top"><small>Time available</small><b id="capLbl">Full session</b></div>
+  <input type="range" id="cap" min="5" max="45" step="5" value="45" aria-label="Time available in minutes">
+  <div class="tb-ticks"><span>5</span><span>15</span><span>25</span><span>35</span><span>Full</span></div></div>
  <button id="testDue" class="ghost due" hidden>📏 Progress test due — tap to record</button>
  <div><small>Today</small><div id="todayChips" class="chips" role="group" aria-label="Today"></div></div>
  <label class="chk toggle"><input type=checkbox class="noEquip" id="noEquipTop"> No equipment (wall &amp; floor only)</label>
@@ -14,7 +17,7 @@
  <p id="guide" class="muted"></p>
  <div class="card row"><div><big id="planTotal">15:00</big><small><span id="planCount"></span> stretches</small></div>
   <button id="regen" class="ghost" aria-label="Regenerate">↻ New routine</button></div>
- <div class="opts" id="lenBox"><label>Length <select id="minutes"><option>10</option><option>15</option><option>20</option><option>25</option></select> min</label>
+ <div class="opts" id="lenBox" hidden><label>Length <select id="minutes"><option>10</option><option>15</option><option>20</option><option>25</option></select> min</label>
 </div>
  <div id="focusBox"><small>Focus (trail running first; others secondary)</small><div id="focusChips" class="chips" role="group" aria-label="Focus"></div></div>
  <details id="devBox" class="card"><summary>Develop: priority areas, weekly progress, loads</summary>

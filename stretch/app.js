@@ -45,8 +45,8 @@ function fullDesc(s){
 }
 // ---------- Plan ----------
 function newRoutine(){const t=settings.type;
-  if(['develop','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES,{avail:Gen.availOf(settings),rest:settings.rest||30});
-  else routine=Gen.generate(STRETCHES,{targetSec:(t==='relax'?15:settings.minutes)*60,focus:t==='relax'?'sleep':settings.focus,avail:Gen.availOf(settings),rest:settings.rest||30});
+  if(['develop','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES,{avail:Gen.availOf(settings),rest:settings.rest||30,maxSec:settings.cap?settings.cap*60:0});
+  else routine=Gen.generate(STRETCHES,{targetSec:(settings.cap||(t==='relax'?15:settings.minutes))*60,focus:t==='relax'?'sleep':settings.focus,avail:Gen.availOf(settings),rest:settings.rest||30});
   routine.type=t;routine.label=TYPES[t]+(t==='random'?' · '+Gen.FOCUSES[routine.focus]:t==='relax'?' · sleep & relaxation':'');renderPlan()}
 function renderEquip(){
   const need=new Set();routine.items.forEach(i=>Gen.equipFor(i,i.bw?0:i.kg).forEach(e=>need.add(e)));
@@ -59,7 +59,7 @@ function renderEquip(){
   $('#ownList').innerHTML=Gen.OWNABLE.map(k=>`<label class="chk"><input type=checkbox data-own="${k}" ${(settings.owned||Gen.OWNABLE).includes(k)?'checked':''}> ${Gen.EQUIP[k]}</label>`).join('');
 }
 function renderDev(){
-  const isDev=['develop','topup'].includes(settings.type);$('#devBox').hidden=!isDev;$('#focusBox').hidden=settings.type!=='random';$('#lenBox').hidden=settings.type!=='random';
+  const isDev=['develop','topup'].includes(settings.type);$('#devBox').hidden=!isDev;$('#focusBox').hidden=settings.type!=='random';$('#lenBox').hidden=true;
   document.querySelectorAll('#todayChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===settings.today));
   document.querySelectorAll('#typeChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===settings.type));
   $('#guide').textContent=TODAY[settings.today][2]+' Do Develop after runs or 6+ hours apart from one.';
@@ -153,6 +153,10 @@ function bindSettings(){
   $('#minutes').value=settings.minutes;$('#rest').value=settings.rest||30;$('#rest').onchange=()=>{settings.rest=Number($('#rest').value);save();newRoutine()};$('#scName').value=settings.shortcut;$('#autoLog').checked=settings.autoLog;
   const save=()=>{settings={...settings,minutes:Number($('#minutes').value),shortcut:$('#scName').value.trim()||'Log Stretch',autoLog:$('#autoLog').checked};LS.set('settings',settings)};
   $('#minutes').addEventListener('change',()=>{save();newRoutine()});
+  const capLbl=()=>{const v=Number($('#cap').value);$('#capLbl').textContent=v>=45?'Full session':v+' min max'};
+  $('#cap').value=settings.cap||45;capLbl();
+  $('#cap').addEventListener('input',capLbl);
+  $('#cap').addEventListener('change',()=>{const v=Number($('#cap').value);settings.cap=v>=45?0:v;LS.set('settings',settings);newRoutine()});
   $('#focusChips').innerHTML=Object.entries(Gen.FOCUSES).map(([k,v])=>`<button type=button data-f="${k}">${v}</button>`).join('');
   $('#focusChips').onclick=e=>{const b=e.target.closest('button');if(!b)return;settings.focus=b.dataset.f;save();newRoutine()};
   $('#todayChips').innerHTML=Object.entries(TODAY).map(([k,v])=>`<button type=button data-t="${k}">${v[0]}</button>`).join('');

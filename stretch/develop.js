@@ -39,10 +39,10 @@ function holdSteps(ex,list,extra={}){ // list of {secs,phase,type?}; repeats per
   const one=side=>list.map(x=>({type:x.type||'hold',secs:x.secs,ex,side,phase:x.phase,...extra}));
   return ex.sides?[...one('Left'),{type:'switch',secs:SW,next:ex,label:'Switch sides'},...one('Right')]:one(null);
 }
-function build(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0}={}){
+function build(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0,maxSec=0}={}){
   // Fit to the time budget instead of running long: Develop drops a PNF area (3 -> 2 -> 1), Pre-run drops trailing drills.
-  if(type==='develop'&&k==null){let r;for(const kk of [3,2,1]){r=build(type,dev,lib,{now,k:kk,avail,rest});if(r.total<=1500)break}return r}
-  if(type==='prerun'&&!drop){let r,dd=0;do{r=build(type,dev,lib,{now,avail,rest,drop:dd||-1});dd++}while(r.total>480&&PRE_RUN.length-dd>=4);return r}
+  if(type==='develop'&&k==null){let r;for(const kk of [3,2,1]){r=build(type,dev,lib,{now,k:kk,avail,rest,maxSec});if(r.total<=(maxSec||1500))break}return r}
+  if(type==='prerun'&&!drop){let r,dd=0;do{r=build(type,dev,lib,{now,avail,rest,maxSec,drop:dd||-1});dd++}while(r.total>Math.min(480,maxSec||480)&&PRE_RUN.length-dd>=4);return r}
   const G=root.Gen||require('./generator.js');const hasW=!avail||avail.includes('weight');
   const L0=Object.fromEntries(lib.map(s=>[s.id,s]));const L=new Proxy(L0,{get:(o,id)=>{const s=o[id];if(!s)return s;const r=G.resolve(s,lib,avail)||s;return r!==s?{...r,swappedFrom:s.name}:r}});const blocks=[];const deload=isDeload(dev,now);
   const add=(name,kind,ex,steps,note,rate)=>blocks.push({name,kind,ex,steps,note,rate});
@@ -70,6 +70,16 @@ function build(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0}={}){
       add('4 · End-range strength','endrange',ex,holdSteps(ex,seq,{area:areaOf(ex)}),`${reps}×${h}s holds${ex.sides?' each side':''}`,{kind:'endrange',ex:id})}
     add('5 · Breathing','breath',L.breathing,holdSteps(L.breathing,[{secs:120,phase:'Slow breathing: 4 in, 6 out'}]),'2 min');
   }
+  // Time slider: drop lowest-value blocks until the session fits maxSec (always keeps at least one main block).
+  if(maxSec){const dur=b=>b.steps.reduce((a,s)=>a+s.secs,0)+rest;let tot=()=>blocks.reduce((a,b)=>a+dur(b),0)-rest;
+    const order=['topup-maint','endrange','loaded','breath-trim','warmup','pnf','topup','breath'];
+    for(const kind of order){while(tot()>maxSec&&blocks.length>1){let i=-1;
+        if(kind==='topup-maint')i=type==='develop'?blocks.findIndex(b=>b.kind==='topup'):-1;
+        else if(kind==='breath-trim'){const b=blocks.find(b=>b.kind==='breath');if(b&&b.steps[0].secs>60){b.steps=b.steps.map(s=>({...s,secs:60}));b.note='1 min';continue}break}
+        else if(kind==='warmup'){const w=blocks.filter(b=>b.kind==='warmup');if(w.length>(type==='prerun'?2:1))i=blocks.lastIndexOf(w.at(-1))}
+        else if(kind==='pnf'){const p=blocks.filter(b=>b.kind==='pnf');if(p.length>1)i=blocks.lastIndexOf(p.at(-1))}
+        else{for(let x=blocks.length-1;x>=0;x--)if(blocks[x].kind===kind){i=x;break}if(kind==='topup'&&blocks.filter(b=>b.kind==='topup').length<=1)i=-1}
+        if(i<0)break;blocks.splice(i,1)}}}
   // flatten with transitions; a 0-10 rating step after each rated block
   const steps=[];const items=[];
   blocks.forEach((b,i)=>{if(i>0)steps.push({type:'transition',secs:rest,next:b.ex,label:'Get ready'});steps.push(...b.steps.map(s=>({...s,block:b.name})));
