@@ -226,11 +226,55 @@ const CUE = {
   START: { txt: "Start", ab: "Start", sym: "Flag, Green", ic: "c-start" }, END: { txt: "Finish", ab: "Finish", sym: "Flag, Red", ic: "c-end" },
 };
 const FLIP = { TL: "TR", TR: "TL", TSLL: "TSLR", TSLR: "TSLL", TSHL: "TSHR", TSHR: "TSHL", KL: "KR", KR: "KL", C: "C", TU: "TU", RNDB: "RNDB" };
-const CUE_DEDUP_M = 20, JOIN_TURN_DEG = 50, JOIN_ARM_M = 30;
+const CUE_DEDUP_M = 40, JOIN_TURN_DEG = 150, JOIN_ARM_M = 30;
 let cuesOn = store.get(KEY.cues) !== "off";
+/** Strict junction test on one raw BRouter voicehint [idx, cmd, exit, distNext, angle, geometry].
+ *  geometry = " inPrio(outAngle)outPrio (altAngle)altPrio …": every other way leaving that node, with the
+ *  profile's priority class (2–6 path, 8–10 track, 12–14 service, 16 steps, 18+ roads). Negative angle = left.
+ *  Returns a cue code, or null when the route just follows the obvious path. */
+function classifyHint(h) {
+  if (h[1] === 13 || h[1] === 14) return "RNDB";
+  const m = String(h[5] || "").trim().match(/^(-?\d+)\((-?\d+)\)(-?\d+)(.*)$/); if (!m) return null;
+  const inP = +m[1], out = +m[2], outP = +m[3], A = Math.abs(out);
+  const alts = [...m[4].matchAll(/\((-?\d+)\)(-?\d+)/g)].map(x => ({ a: +x[1], p: +x[2] }));
+  // a side way counts only if it is a road, or a trail/track not much minor to the ones we are on (no driveways, spurs)
+  const sig = alts.filter(x => x.p > 0 && Math.abs(x.a) < 165 && (x.p >= 16 || x.p >= Math.min(inP, outP) - 4) && !(x.p >= 12 && x.p <= 14 && Math.max(inP, outP) >= 16));
+  if (!sig.length) return null;                                   // not a real intersection (≥3 significant ways)
+  if (A >= 45) {                                                  // real turn, but only if another way is an equally obvious choice
+    if (!sig.some(x => Math.abs(x.a) <= A + 30)) return null;
+    return A >= 135 ? (out < 0 ? "TSHL" : "TSHR") : out < 0 ? "TL" : "TR";
+  }
+  // going roughly straight: cue only when a significant way crosses (both sides), e.g. a road or a track over a path
+  const cross = w => Math.abs(w.a) >= 45 && (w.p >= 16 || (w.p >= 8 && w.p > inP));
+  return sig.some(x => cross(x) && x.a < 0) && sig.some(x => cross(x) && x.a > 0) ? "C" : null;
+}
+const CUE_VER = 2;     // bump to recompute cues stored by older versions
 function parseHints(vh, n) {
   if (!Array.isArray(vh)) return [];
-  return vh.map(h => ({ i: +h[0], t: VH[h[1]] })).filter(c => c.t && c.i > 0 && c.i < n - 1);
+  return vh.map(h => ({ i: +h[0], t: classifyHint(h) })).filter(c => c.t && c.i > 0 && c.i < n - 1);
+}
+/** Junction at a join between two snapped legs: BRouter gives no hint at a via point, so route a short
+ *  probe from ~60 m before to ~60 m after the join and keep a hint that lands on it. Cached per join. */
+const joinCache = new Map();
+async function joinCue(prev, s) {
+  const P = prev.pts, Q = s.pts, J = Q[0]; if (P.length < 2 || Q.length < 2) return null;
+  let a = P.length - 1, d = 0; while (a > 0 && d < 60) { d += hav(P[a - 1], P[a]); a-- }
+  let b = 0; d = 0; while (b < Q.length - 1 && d < 60) { d += hav(Q[b], Q[b + 1]); b++ }
+  const k = [P[a], J, Q[b]].map(eleKey).join("|"); if (joinCache.has(k)) return joinCache.get(k);
+  const r = await route({ lat: P[a][0], lng: P[a][1] }, { lat: Q[b][0], lng: Q[b][1] }, true);
+  const c = r.fallback ? null : r.cues.find(c => hav(r.pts[c.i], J) < 15);
+  const t = c ? c.t : null; if (!r.fallback) joinCache.set(k, t); return t;
+}
+async function updJoins() {
+  let ch = false;
+  for (let j = 1; j < segs.length; j++) {
+    const p = segs[j - 1], s = segs[j];
+    if (s.mode !== "snap" || p.mode !== "snap" || s.fallback || p.fallback || !s.pts.length || !p.pts.length) { if (s.jc) { delete s.jc; ch = true } continue }
+    const key = eleKey(p.pts.at(-2) || p.pts[0]) + eleKey(s.pts[0]) + eleKey(s.pts[1] || s.pts[0]);
+    if (s.jk === key) continue;
+    const t = await joinCue(p, s); if (segs[j] !== s) continue; s.jc = t; s.jk = key; ch = true;
+  }
+  if (ch) { render(); save() }
 }
 /** Cues of a leg travelled backwards: mirror indices, swap left/right. */
 const reverseCues = (cues, n) => (cues || []).map(c => ({ i: n - 1 - c.i, t: FLIP[c.t] || c.t })).reverse();
@@ -248,8 +292,10 @@ function buildCues(P = SC.pts, cum = SC.cum) {
   segs.forEach((s, j) => {
     const n = s.pts.length; if (!n) return;
     (s.cues || []).forEach(c => { if (c.i > 0 && c.i < n - 1) raw.push({ g: base + c.i, t: c.t, pr: c.t === "C" ? 1 : 2 }) });
+    if (j > 0 && s.jc && base > 0) raw.push({ g: base, t: s.jc, pr: s.jc === "C" ? 1 : 2, join: true });
     base += n - 1;
-    if (j < segs.length - 1 && base > 0 && base < P.length - 1) { const d = turnAt(P, cum, base); if (Math.abs(d) >= JOIN_TURN_DEG) raw.push({ g: base, t: turnCode(d), pr: 1.5, join: true }) }
+    // out-and-back turnaround at a leg join (no junction needed)
+    if (j < segs.length - 1 && base > 0 && base < P.length - 1) { const d = turnAt(P, cum, base); if (Math.abs(d) >= JOIN_TURN_DEG) raw.push({ g: base, t: "TU", pr: 2.5, join: true }) }
   });
   raw.push({ g: P.length - 1, t: "END", pr: 3 });
   raw.forEach(c => { c.g = Math.max(0, Math.min(P.length - 1, c.g)); c.d = cum[c.g] });
@@ -267,13 +313,14 @@ function buildCues(P = SC.pts, cum = SC.cum) {
 /** Old saved snap legs have no cues: re-ask BRouter once and map its hints onto the stored points. */
 async function rebuildCues() {
   for (const s of segs) {
-    if (s.mode !== "snap" || s.fallback || s.imported || Array.isArray(s.cues) || s.pts.length < 3) continue;
+    if (s.mode !== "snap" || s.fallback || s.imported || (Array.isArray(s.cues) && s.cv === CUE_VER) || s.pts.length < 3) continue;
     const r = await route({ lat: s.pts[0][0], lng: s.pts[0][1] }, { lat: s.pts.at(-1)[0], lng: s.pts.at(-1)[1] }, true);
     if (r.fallback) continue;
     s.cues = r.cues.map(c => { const q = r.pts[c.i]; let bi = 0, bd = Infinity; s.pts.forEach((p, k) => { const d = hav(p, q); if (d < bd) { bd = d; bi = k } }); return bd < 25 ? { i: bi, t: c.t } : null })
       .filter(c => c && c.i > 0 && c.i < s.pts.length - 1);
+    s.cv = CUE_VER;
   }
-  save(); render();
+  save(); render(); updJoins();
 }
 
 /* 5. Route editing & drawing --------------------------------------------------- */
@@ -292,14 +339,14 @@ function trackPts() { const o = []; segs.forEach(s => s.pts.forEach((p, k) => { 
 async function buildSeg(i) {
   const s = segs[i], a = anchors[i], b = anchors[i + 1]; setBusy(1);
   try {
-    if (s.mode === "snap") { const r = await route(a, b); if (segs[i] !== s) return; s.pts = r.pts; s.fallback = r.fallback; s.cues = r.cues }
+    if (s.mode === "snap") { const r = await route(a, b); if (segs[i] !== s) return; s.pts = r.pts; s.fallback = r.fallback; s.cues = r.cues; s.cv = CUE_VER }
     else {
       const pv = i > 0 && segs[i - 1].pts.length ? segs[i - 1].pts.at(-1) : null;
       s.pts[0] = pv ? [pv[0], pv[1], null] : [a.lat, a.lng, null]; s.pts[s.pts.length - 1] = [b.lat, b.lng, null];
     }
     await fillEle(s.pts);
   } finally { setBusy(-1) }
-  if (segs[i] === s) { render(); save() }
+  if (segs[i] === s) { render(); save(); if (!pending) updJoins() }
 }
 function addAnchor(ll) { anchors.push({ lat: ll.lat, lng: ll.lng }); addMarker(anchors.length - 1); updHint() }
 function addMarker(i) {
@@ -321,9 +368,9 @@ function returnPath() {
   if (anchors.length < 2 || segs.length !== anchors.length - 1 || segs.some(s => !s.pts.length)) return toast("Finish drawing the route first");
   for (let i = segs.length - 1; i >= 0; i--) {
     const s = segs[i]; anchors.push({ ...anchors[i] }); addMarker(anchors.length - 1);
-    segs.push({ mode: s.mode, pts: s.pts.map(p => [...p]).reverse(), ...(s.fallback ? { fallback: true } : {}), ...(s.imported ? { imported: true } : {}), ...(Array.isArray(s.cues) ? { cues: reverseCues(s.cues, s.pts.length) } : {}) });
+    segs.push({ mode: s.mode, pts: s.pts.map(p => [...p]).reverse(), ...(s.fallback ? { fallback: true } : {}), ...(s.imported ? { imported: true } : {}), ...(Array.isArray(s.cues) ? { cues: reverseCues(s.cues, s.pts.length), cv: s.cv } : {}) });
   }
-  render(); save(); updHint(); toast("Return leg added – Undo removes it a point at a time");
+  render(); save(); updHint(); updJoins(); toast("Return leg added – Undo removes it a point at a time");
 }
 function clearRoute() {
   if (anchors.length && !confirm("Clear the whole route?")) return;
@@ -874,7 +921,7 @@ if (!gOn) { $("gTog").classList.remove("on"); $("gTog").setAttribute("aria-press
 measureSheet(); map.invalidateSize();
 setTab(tab);
 load(); updLegend(); render(); renderW(); updHint();
-if (segs.some(s => s.mode === "snap" && !s.fallback && !Array.isArray(s.cues))) rebuildCues();
+if (segs.some(s => s.mode === "snap" && !s.fallback && s.cv !== CUE_VER)) rebuildCues(); else updJoins();
 if (eleWarn || allPts().some(p => p[2] == null)) backfillAll();
 
-window.TP = { buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
+window.TP = { classifyHint, updJoins, buildCues, reverseCues, parseHints, setTab, rebuildCues, setGrade, gradeArr, gBand, setScrub, scrubState, SC, nearestDist, importGpx, parseGpx, backfillAll, interpEle, addWpt, makeGpx, simplify, climb, route, fillEle, naismith }; // for tests
