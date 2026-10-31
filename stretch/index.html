@@ -8,7 +8,7 @@
 <section id="home">
  
  <h1 class="large">Stretch by Bot</h1>
- <div id="hero" class="card hero"><small id="heroDay"></small><h2 id="heroTitle"></h2><p id="heroMeta"></p><div id="heroChips" class="achips"></div><p id="heroGuide"></p></div>
+ <div id="hero" class="card hero"><div class="herotop"><small id="heroDay"></small><button id="regen" class="regen" aria-label="New routine">↻ New</button></div><h2 id="heroTitle"></h2><p id="heroMeta"></p><div id="heroChips" class="achips"></div><p id="heroGuide"></p></div>
  <ul id="optRows" class="list rows"></ul>
  <div class="legacy" hidden><small class="sh">Time available</small><div class="card timebar"><div class="tb-top"><span>Session length</span><b id="capLbl">Full session</b></div>
   <input type="range" id="cap" min="5" max="45" step="5" value="45" aria-label="Time available in minutes">
@@ -20,8 +20,8 @@
  <small class="sh">Equipment</small><div id="equipPanel" class="card"><div id="equipList"></div><small id="equipSwaps"></small>
   <label class="switch"><span>Bodyweight only (wall &amp; floor)</span><input type=checkbox class="noEquip" id="noEquipTop" role="switch"><i></i></label>
   <details><summary>Equipment I own</summary><div id="ownList"></div><small>Moves needing anything unticked are swapped for bodyweight versions automatically.</small></details></div>
- <div class="card row"><div><big id="planTotal">15:00</big><small><span id="planCount"></span> stretches<span id="planRests"></span></small></div>
-  <button id="regen" class="tinted" aria-label="New routine">↻ New routine</button></div>
+ <div class="legacy" hidden><div class="card row"><div><big id="planTotal">15:00</big><small><span id="planCount"></span> stretches<span id="planRests"></span></small></div>
+  </div></div>
  <div id="focusBox"><small class="sh">Focus · trail running first</small><div id="focusChips" class="chips" role="group" aria-label="Focus"></div></div>
  <details id="devBox" class="card"><summary>Develop · areas, progress &amp; loads</summary>
   <p id="devNote" class="muted"></p><div id="weekBars"></div>
