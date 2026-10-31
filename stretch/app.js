@@ -6,9 +6,16 @@ let settings=LS.get('settings',{minutes:15,focus:'trail',type:'develop',today:'r
 if(!settings.hv2){settings.autoLog=false;settings.hv2=1;LS.set('settings',settings)} // auto-open caused stalls when the Shortcut wasn't installed
 const SHORTCUT_INSTALL_URL='https://www.icloud.com/shortcuts/1bb052f8ee714b4c8485bb57f35a4260'; // iCloud link for the ready-made "Log Stretch" Shortcut
 settings.focus=Gen.normFocus(settings.focus||settings.bias||'trail');delete settings.bias;settings.type=settings.type||'develop';settings.rest=settings.rest||30;settings.today=settings.today||'rest';
-let dev=LS.get('dev',null)||Dev.fresh();const saveDev=()=>LS.set('dev',dev);
-const TYPES={prerun:'Pre-run warm-up',develop:'Develop',topup:'Top-up',relax:'Relax',random:'Random'};
-const TODAY={prerun:['Pre-run','prerun','Dynamic warm-up only (5–8 min). No long static holds or PNF before running.'],postrun:['Post-run','develop','Muscles are warm: Develop (20–25 min) or a Top-up (8–10 min).'],longrun:['Long run done','relax','After a long run, keep it gentle: Relax.'],rest:['Rest day','develop','Rest day: a full Develop session.']};
+// Load + migrate Develop state safely: back up the untouched v1 object once, then add new fields only (nothing deleted).
+let dev=(()=>{const raw=LS.get('dev',null);if(raw&&(raw.v||1)<2&&!localStorage.getItem('dev_backup_v1'))localStorage.setItem('dev_backup_v1',JSON.stringify(raw));
+  const d=Dev.migrate(raw);if(!d.hist.length){const byName=Object.fromEntries(STRETCHES.map(s=>[s.name,s]));
+    for(const h of LS.get('history',[]).slice(0,20).reverse()){if(Date.now()-new Date(h.date)>14*864e5)continue;const items=(h.stretches||[]).map(n=>byName[n]).filter(s=>s&&s.kind!=='warmup'&&s.kind!=='breath').map(s=>({id:s.id,role:s.kind==='loaded'?'L':s.kind==='endrange'?'E':'S',pattern:s.pattern||null}));
+      if(items.length)d.hist.push({d:Dev.dayKey(new Date(h.date).getTime()),t:h.type||'develop',items})}}
+  return d})();const saveDev=()=>LS.set('dev',dev);saveDev();
+if(!settings.v12){if(settings.type==='develop')settings.type='plan';settings.v12=1;LS.set('settings',settings)}
+let regen=0;
+const TYPES={plan:"Today's plan",develop:'Develop',light:'Light',prerun:'Pre-run warm-up',topup:'Top-up',relax:'Relax',random:'Random'};
+const TODAY={prerun:['Pre-run','prerun','Dynamic warm-up only (5–8 min). No long static holds or PNF before running.'],postrun:['Post-run','plan','Muscles are warm: Develop (20–25 min) or a Top-up (8–10 min).'],longrun:['Long run done','plan','After a long run: an easy flexibility flow (for range and relaxation; stretching does not speed recovery). Tomorrow becomes a Light day.'],rest:['Rest day','plan','Rest day: follow the weekly plan.']};
 let routine=null, run=null, wakeLock=null, actx=null;
 
 function fmt(s){s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
@@ -61,13 +68,13 @@ function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function fullDesc(s){
   return `<div class="desc"><p><b>Setup:</b> ${esc(s.setup)}</p><ol>${s.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
 <p><b>Feel it:</b> ${esc(s.feel)}</p><p><b>Avoid:</b> ${esc(s.mistakes)}</p>
-<p><b>Easier:</b> ${esc(s.easier)}<br><b>Harder:</b> ${esc(s.harder)}</p>${s.perSide?`<p class="side">↔ <b>Per side:</b> ${esc(s.perSide)}</p>`:''}</div>`;
+${s.demoNote?`<p class="muted">${esc(s.demoNote)}</p>`:''}<p><b>Easier:</b> ${esc(s.easier)}<br><b>Harder:</b> ${esc(s.harder)}</p>${s.perSide?`<p class="side">↔ <b>Per side:</b> ${esc(s.perSide)}</p>`:''}</div>`;
 }
 // ---------- Plan ----------
 function newRoutine(){const t=settings.type;
-  if(['develop','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES,{avail:Gen.availOf(settings),rest:settings.rest||30,maxSec:settings.cap?settings.cap*60:0});
+  if(['plan','develop','light','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES,{avail:Gen.availOf(settings),rest:settings.rest||30,maxSec:settings.cap?settings.cap*60:0,seed:regen,longHolds:!!settings.longHolds,plan:{today:settings.today,lastLong:settings.lastLong,maintenance:!!settings.maintenance}});
   else routine=Gen.generate(STRETCHES,{targetSec:(settings.cap||(t==='relax'?15:settings.minutes))*60,focus:t==='relax'?'sleep':settings.focus,avail:Gen.availOf(settings),rest:settings.rest||30});
-  routine.type=t;routine.label=TYPES[t]+(t==='random'?' · '+Gen.FOCUSES[routine.focus]:t==='relax'?' · sleep & relaxation':'');renderPlan()}
+  routine.type=routine.type||t;routine.label=(routine.plan?routine.plan.label:TYPES[t])+(t==='random'?' · '+Gen.FOCUSES[routine.focus]:t==='relax'?' · sleep & relaxation':'');renderPlan()}
 function renderEquip(){
   const need=new Set();routine.items.forEach(i=>Gen.equipFor(i,i.bw?0:i.kg).forEach(e=>need.add(e)));
   const kgs=routine.items.filter(i=>i.kind==='loaded'&&!i.bw&&i.kg>0).map(i=>`${i.kg} kg`);
@@ -79,7 +86,7 @@ function renderEquip(){
   $('#ownList').innerHTML=Gen.OWNABLE.map(k=>`<label class="chk"><input type=checkbox data-own="${k}" ${(settings.owned||Gen.OWNABLE).includes(k)?'checked':''}> ${Gen.EQUIP[k]}</label>`).join('');
 }
 function renderDev(){
-  const isDev=['develop','topup'].includes(settings.type);$('#devBox').hidden=!isDev;$('#focusBox').hidden=settings.type!=='random';
+  const isDev=['plan','develop','light','topup'].includes(settings.type);$('#devBox').hidden=!isDev;$('#focusBox').hidden=settings.type!=='random';
   document.querySelectorAll('#todayChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===settings.today));
   document.querySelectorAll('#typeChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.t===settings.type));
   $('#guide').textContent=TODAY[settings.today][2]+' Do Develop after runs or 6+ hours apart from one.';
@@ -87,10 +94,12 @@ function renderDev(){
   if(!isDev)return;
   const ws=Dev.weekSecs(dev);
   $('#areaPick').innerHTML=Object.entries(Dev.AREAS).map(([k,a])=>`<label class="chk"><input type=checkbox data-a="${k}" ${dev.areas.includes(k)?'checked':''}> ${a.name}${a.secondary?' <small style="display:inline">(secondary)</small>':''}${dev.maint.includes(k)?' <small style="display:inline">· maintenance</small>':''}</label>`).join('');
-  $('#weekBars').innerHTML=dev.areas.concat(dev.maint).map(a=>{const v=ws[a]||0;return `<div class="wk"><span>${Dev.AREAS[a].name}</span><span>${Math.round(v/60)}/${10}–15 min</span><div class="bar"><div style="width:${Math.min(100,v/9)}%"></div><i style="left:${600/9}%"></i></div></div>`}).join('');
+  const RR=Dev.R,tg=RR.weeklyTargetMinPerArea*60,fl=RR.weeklyFloorMinPerArea*60;
+  $('#weekBars').innerHTML=dev.areas.concat(dev.maint).map(a=>{const v=ws[a]||0;return `<div class="wk"><span>${Dev.AREAS[a].name}</span><span>${Math.round(v/60)}/${RR.weeklyFloorMinPerArea}–${RR.weeklyTargetMinPerArea} min · ${Dev.weekDays(dev,a)}/${RR.minDaysPerWeekPerArea} days</span><div class="bar"><div style="width:${Math.min(100,v/tg*100)}%"></div><i style="left:${fl/tg*100}%"></i></div></div>`}).join('');
+  $('#maintSw').checked=!!settings.maintenance;$('#longSw').checked=!!settings.longHolds;
   const loads=[...new Set(routine.items.filter(i=>i.kind==='loaded'&&!i.bw).map(i=>i.id))];
   $('#loads').innerHTML=loads.map(id=>`<label>${STRETCHES.find(x=>x.id===id).name} load <input type=number min=0 step=0.5 data-load="${id}" value="${dev.loads[id]||0}" style="width:5em"> kg</label>`).join('');
-  $('#devNote').textContent=`Week ${routine.week}${routine.deload?' · DELOAD week (volume cut ~40%)':''}${routine.areasToday&&routine.areasToday.length?' · PNF today: '+routine.areasToday.map(a=>Dev.AREAS[a].name).join(', '):''}`;
+  $('#devNote').textContent=`${routine.plan?routine.plan.label+' · ':''}Week ${routine.week}${routine.deload?' · DELOAD week (volume cut ~40%)':''}${routine.areasToday&&routine.areasToday.length?' · PNF today: '+routine.areasToday.map(a=>Dev.AREAS[a].name).join(', '):''}`;
 }
 function renderPlan(){
   $('#planTotal').textContent=fmt(Gen.totalSec(routine.steps));
@@ -117,7 +126,7 @@ function enterStep(i){
   $('#pPhase').className=st.type;run.spoke10=false;run.beeped={};
   const rest=isRest(st)&&st.type!=='rate';$('#player').classList.toggle('rest',rest);$('#pRest').hidden=!rest;
   if(rest){const nx=st.next||st.ex;$('#pRest').querySelector('b').textContent=st.type==='switch'?'Rest · Switch sides':'Rest';$('#pRestNext').textContent=st.type==='switch'?'Next up: '+nx.name+' (Right)':'Next up: '+nx.name}
-  if(st.type==='rate'){$('#rateQ').textContent=`How uncomfortable was “${st.block}”? 0 = nothing, 10 = worst`;$('#pain').checked=false;$('#rateMsg').textContent=''}
+  if(st.type==='rate'){$('#rateQ').textContent=st.rate.kind==='loaded'?`How hard was “${st.block}”? 0 = easy, 10 = max effort`:`How uncomfortable was “${st.block}”? 0 = nothing, 10 = worst`;$('#pain').checked=false;$('#rateMsg').textContent=''}
   $('#pName').textContent=ex.icon+' '+ex.name;
   if($('#pDemo').dataset.id!==ex.id){$('#pDemo').innerHTML=demoSVG(ex);$('#pDemo').dataset.id=ex.id;$('#pDesc').innerHTML=fullDesc(ex);$('#pCue').textContent=ex.cue}
   $('#pStep').textContent=`Step ${i+1}/${routine.steps.length}`;
@@ -154,7 +163,7 @@ function shortcutURL(minutes){return 'shortcuts://run-shortcut?name='+encodeURIC
 function rate(n){const st=routine.steps[run.i];const msg=Dev.applyRating(dev,st.rate,n,$('#pain').checked);saveDev();window.__lastRating=msg;$('#rateMsg').textContent='Next time: '+msg;
   setTimeout(()=>{if(run&&run.i===routine.steps.indexOf(st)){if(run.i+1<routine.steps.length)enterStep(run.i+1);else finish()}},SPEED>1?50:900)}
 function finish(early){
-  creditStep();clearTimeout(run.raf);if(routine.type==='develop'&&!early){Dev.nextRotation(dev,routine.areasToday.length||3)}saveDev();release();beep(988,0.5);
+  creditStep();clearTimeout(run.raf);if(['develop','light','topup'].includes(routine.type)){Dev.record(dev,routine)}saveDev();release();beep(988,0.5);
   const secs=early?Math.round((Date.now()-run.startedAt)/1000*SPEED):Gen.totalSec(routine.steps);
   const minutes=Math.max(1,Math.round(secs/60));
   const hist=LS.get('history',[]);hist.unshift({date:new Date().toISOString(),secs,minutes,stretches:routine.items.map(s=>s.name),focus:routine.focus,type:routine.type,focusName:routine.label,complete:!early});LS.set('history',hist.slice(0,200));
@@ -190,7 +199,7 @@ function bindSettings(){
   $('#focusChips').onclick=e=>{const b=e.target.closest('button');if(!b)return;settings.focus=b.dataset.f;save();newRoutine()};
   $('#todayChips').innerHTML=Object.entries(TODAY).map(([k,v])=>`<button type=button data-t="${k}">${v[0]}</button>`).join('');
   $('#typeChips').innerHTML=Object.entries(TYPES).map(([k,v])=>`<button type=button data-t="${k}">${v}</button>`).join('');
-  $('#todayChips').onclick=e=>{const b=e.target.closest('button');if(!b)return;settings.today=b.dataset.t;settings.type=TODAY[b.dataset.t][1];save();newRoutine()};
+  $('#todayChips').onclick=e=>{const b=e.target.closest('button');if(!b)return;settings.today=b.dataset.t;settings.type=TODAY[b.dataset.t][1];if(b.dataset.t==='longrun')settings.lastLong=Dev.dayKey(Date.now());save();newRoutine()};
   $('#typeChips').onclick=e=>{const b=e.target.closest('button');if(!b)return;settings.type=b.dataset.t;save();newRoutine()};
   $('#areaPick').onchange=e=>{const a=e.target.dataset.a;if(!a)return;let ar=dev.areas.filter(x=>x!==a);if(e.target.checked)ar.push(a);
     if(ar.length<3||ar.length>4){e.target.checked=!e.target.checked;$('#areaMsg').textContent='Pick 3–4 priority areas.';return}$('#areaMsg').textContent='';dev.areas=ar;dev.maint=dev.maint.filter(x=>x!==a);dev.rotate=0;saveDev();newRoutine()};
@@ -199,7 +208,7 @@ function bindSettings(){
   $('#loads').onchange=e=>{const id=e.target.dataset.load;if(!id)return;dev.loads[id]=Math.max(0,Number(e.target.value)||0);saveDev();newRoutine()};
   ['#scName','#autoLog'].forEach(s=>$(s).addEventListener('change',save));
 }
-$('#regen').onclick=newRoutine;$('#startBtn').onclick=start;$('#pauseBtn').onclick=togglePause;$('#skipBtn').onclick=skip;$('#backBtnP').onclick=prev;
+$('#regen').onclick=()=>{regen++;newRoutine()};$('#maintSw').onchange=e=>{settings.maintenance=e.target.checked;LS.set('settings',settings);newRoutine()};$('#longSw').onchange=e=>{settings.longHolds=e.target.checked;LS.set('settings',settings);newRoutine()};$('#startBtn').onclick=start;$('#pauseBtn').onclick=togglePause;$('#skipBtn').onclick=skip;$('#backBtnP').onclick=prev;
 $('#rateBtns').innerHTML=[...Array(11).keys()].map(n=>`<button type=button data-n=${n}>${n}</button>`).join('');$('#rateBtns').onclick=e=>{const b=e.target.closest('button');if(b&&run&&run.waiting){run.waiting=false;rate(+b.dataset.n)}};
 $('#stopBtn').onclick=()=>{if(confirm('End session now and save what you did?'))stop(true)};
 $('#homeBtn').onclick=()=>{newRoutine();show('home')};
@@ -207,7 +216,7 @@ $('#histBtn').onclick=()=>{renderHistory();show('history')};$('#tabHome').onclic
 $('#clearHist').onclick=()=>{if(confirm('Delete all history?')){LS.set('history',[]);renderHistory()}};
 function exportData(){return {app:'stretch15',exported:new Date().toISOString(),settings,history:LS.get('history',[]),dev}}
 $('#exportHist').onclick=()=>{const b=new Blob([JSON.stringify(exportData(),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='stretch-backup.json';a.click()};
-function importData(o){if(Array.isArray(o))o={history:o};if(o.history)LS.set('history',o.history);if(o.dev){dev={...Dev.fresh(),...o.dev};saveDev()}if(o.settings){settings={...settings,...o.settings};LS.set('settings',settings)}bindSettings();newRoutine();renderHistory();renderTests()}
+function importData(o){if(Array.isArray(o))o={history:o};if(o.history)LS.set('history',o.history);if(o.dev){dev=Dev.migrate({...o.dev});saveDev()}if(o.settings){settings={...settings,...o.settings};LS.set('settings',settings)}bindSettings();newRoutine();renderHistory();renderTests()}
 $('#importHist').onclick=()=>$('#importFile').click();
 $('#importFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{importData(JSON.parse(await f.text()));$('#histWeek').textContent='Backup imported.'}catch(err){alert('Could not read that file: '+err.message)}};
 // ---------- Progress tests ----------
@@ -215,14 +224,17 @@ const TEST_HOWTO={
  ktw:'Knee-to-wall: barefoot, big toe a measured distance from a wall. Drive the knee to touch the wall with the heel down and the knee over the 2nd toe. Move the foot back until you just can’t touch. Record toe-to-wall distance in cm.',
  sar:'Sit-and-reach: sit with legs straight and soles against a box or step. Reach both hands forward slowly and hold 2 s. Record cm past your toes (negative if short). Best of 2.',
  aslr:'Active straight-leg raise: lie on your back, legs straight. Lift one leg as high as you can with no help, knee straight, other leg flat. Measure the angle from the floor (a phone level app on the shin works).',
- thomas:'Thomas test: sit on the very end of a bed, roll back hugging both knees, then let one leg hang. Pass if the back of that thigh rests flat (or below the bed) with the knee bent about 80–90°.',
+ thomas:'Thomas test: sit on the very end of a bed, roll back hugging one knee, let the other leg hang relaxed. Measure how many cm the back of the hanging thigh (just above the knee) sits above the bed surface: 0 = flat, negative = below.',
+ hiprot:'Seated hip rotation: sit tall on a table edge, knees bent 90°, thighs level. Keep the thigh still and swing the lower leg out (internal rotation) or in (external rotation). Measure the shin angle from vertical with a phone level app on the shin.',
+ straddle:'Straddle width: sit against a wall, legs straight, slide them apart as wide as is comfortable with knees and toes up. Measure heel to heel in cm.',
  shoulder:'Lying shoulder flexion: lie on your back with knees bent and lower back flat. Raise both straight arms overhead. Pass if the arms reach the floor without the ribs or back lifting.'};
+function renderEvidence(){const E=Dev.E;$('#evVer').textContent=`Evidence v${E.version} · reviewed ${E.reviewed}`;$('#evList').innerHTML=E.sources.map(s=>`<li><a href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.cite)}</a><small>${esc(s.used)}</small></li>`).join('')}
 function renderTests(){
   const T=Dev.TESTS;
-  $('#testForm').innerHTML=Object.entries(T).map(([k,t])=>t.unit==='pass'?`<label>${t.name} <select data-k="${k}"><option value="">—</option><option value="1">Pass</option><option value="0">Fail</option></select></label>`:`<label>${t.name} <input type=number step=0.5 data-k="${k}" style="width:5em"> ${t.unit} <small style="display:inline">(target ${t.target})</small></label>`).join('');
+  $('#testForm').innerHTML=Object.entries(T).filter(([k,t])=>!t.legacy).map(([k,t])=>t.unit==='pass'?`<label>${t.name} <select data-k="${k}"><option value="">—</option><option value="1">Pass</option><option value="0">Fail</option></select></label>`:`<label>${t.name} <input type=number step=0.5 data-k="${k}" style="width:5em"> ${t.unit}${t.target!=null?` <small style="display:inline">(target ${t.lower?'≤ ':''}${t.target})</small>`:''}</label>`).join('');
   $('#testHow').innerHTML=Object.values(TEST_HOWTO).map(x=>`<li>${esc(x)}</li>`).join('');
   const tl=dev.tests;$('#testNotes').innerHTML=(dev.notes||[]).map(x=>`<li>${esc(x)}</li>`).join('')||'<li>No tests yet.</li>';
-  $('#testDueMsg').textContent=Dev.testDue(dev)?'A progress test is due (every 3 weeks).':'Next test due '+new Date(new Date(tl[tl.length-1].date).getTime()+21*864e5).toLocaleDateString();
+  $('#testDueMsg').textContent=(Dev.testDue(dev)?`A progress test is due (every ${Dev.R.retestDays} days).`:'Next test due '+Dev.nextTestDate(dev).toLocaleDateString())+' Same time of day, after the same 3-min warm-up; best of 3 tries. Skip any test that hurts.';
   $('#charts').innerHTML=Object.entries(T).map(([k,t])=>{const pts=tl.map((x,i)=>[i,x[k]]).filter(p=>p[1]!=null&&p[1]!=='');if(!pts.length)return '';
     const vs=pts.map(p=>+p[1]),mn=Math.min(...vs,t.unit==='pass'?0:t.target)-1,mx=Math.max(...vs,t.unit==='pass'?1:t.target)+1,X=i=>10+i*(180/Math.max(1,tl.length-1)),Y=v=>55-(v-mn)/(mx-mn)*45;
     return `<div class="chart"><small>${t.name}: ${pts.map(p=>t.unit==='pass'?(+p[1]?'pass':'fail'):p[1]+t.unit).join(' → ')}</small><svg viewBox="0 0 200 60">${t.unit!=='pass'?`<line x1=0 x2=200 y1="${Y(t.target)}" y2="${Y(t.target)}" class=tgt />`:''}<polyline points="${pts.map(p=>X(p[0])+','+Y(+p[1])).join(' ')}"/>${pts.map(p=>`<circle cx="${X(p[0])}" cy="${Y(+p[1])}" r=3 />`).join('')}</svg></div>`}).join('');
@@ -231,7 +243,7 @@ $('#saveTest').onclick=()=>{const r={date:new Date().toISOString()};document.que
   if(Object.keys(r).length<2)return alert('Enter at least one result.');dev.tests.push(r);Dev.analyzeTests(dev);saveDev();renderTests();newRoutine()};
 $('#testsBtn').onclick=()=>{renderTests();show('tests')};$('#testDue').onclick=()=>{renderTests();show('tests')};$('#testsBack').onclick=()=>{newRoutine();show('home')};
 $('#testSc').onclick=()=>fire(shortcutURL(1));
-bindSettings();newRoutine();show('home');
+bindSettings();newRoutine();renderEvidence();show('home');
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js');
 
 // ---------- Haptic-like feedback ----------

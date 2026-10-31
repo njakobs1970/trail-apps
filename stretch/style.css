@@ -100,7 +100,8 @@ details>summary::after{content:'›';margin-left:auto;color:var(--label3);font-s
 .desc{text-align:left;font-size:15px}.desc p{margin:8px 0}.desc ol{margin:8px 0;padding-left:24px}.desc li{background:none;padding:2px 0;display:list-item}.desc li::before{display:none}.desc .side{color:var(--orange)}
 /* player */
 #player{text-align:center;min-height:calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));gap:16px}
-.top{display:flex;justify-content:space-between;color:var(--label2);font-size:15px;font-variant-numeric:tabular-nums}
+.top{display:flex;justify-content:space-between;align-items:baseline;color:var(--label);font-size:19px;font-weight:600;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+.ev li{display:block}.ev small{display:block;color:var(--label2)}
 #pPhase{font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:13px;color:var(--accent)}
 #pPhase.transition,#pPhase.switch,#pPhase.rate{color:var(--orange)}#pPhase.contract{color:var(--red)}#pPhase.relax{color:var(--blue)}
 #pDemo .demo{max-height:28vh}

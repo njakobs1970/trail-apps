@@ -36,10 +36,12 @@ function generate(lib,{targetSec=900,focus,bias,avail=null,rest=REST_DEFAULT}={}
   // standing/warm-up moves first -> kneeling -> seated/all-fours -> lying, so running warms up first
   // and sleep winds down to the floor and finishes lying still (legs up the wall last).
   if(focus!=='full')chosen.sort((a,b)=>(a.order||4)-(b.order||4));
-  const fixed=(chosen.length-1)*TRANSITION+chosen.filter(s=>s.sides).length*SWITCH;
-  const holdSum=chosen.reduce((a,s)=>a+(s.sides?2:1)*base(s),0);
-  const k=(targetSec-fixed)/holdSum;
-  const items=chosen.map(s=>({...s,hold:Math.max(20,Math.round(base(s)*k))}));
+  // Holds never go below the evidence floor (30 s): fit the time by dropping stretches, not by shortening holds.
+  const MIN=(root.EVIDENCE&&root.EVIDENCE.rules.holdMin)||30;let items;
+  for(;;){const fixed=(chosen.length-1)*TRANSITION+chosen.filter(s=>s.sides).length*SWITCH;
+    const holdSum=chosen.reduce((a,s)=>a+(s.sides?2:1)*base(s),0);const k=(targetSec-fixed)/holdSum;
+    items=chosen.map(s=>({...s,hold:Math.max(MIN,Math.round(base(s)*k))}));
+    const tot=fixed+items.reduce((a,s)=>a+(s.sides?2:1)*s.hold,0);if(tot<=targetSec+30||chosen.length<=1)break;chosen=chosen.slice(0,-1)}
   return {items,steps:toSteps(items,rest),focus};
 }
 function toSteps(items,rest=REST_DEFAULT){

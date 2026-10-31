@@ -24,11 +24,17 @@
  <details id="devBox" class="card"><summary>Develop · areas, progress &amp; loads</summary>
   <p id="devNote" class="muted"></p><div id="weekBars"></div>
   <small>Priority areas (pick 3–4)</small><div id="areaPick"></div><p id="areaMsg" class="muted"></p>
-  <div id="loads"></div></details>
+  <div id="loads"></div>
+  <label class="switch"><span>Maintenance mode<small>Light holds every day at the 10 min/week floor. Gains fade if you stop completely.</small></span><input type=checkbox id="maintSw" role="switch"><i></i></label>
+  <label class="switch"><span>Allow longer holds (up to 90 s)<small>Default cap is 60 s; weekly time matters more than hold length.</small></span><input type=checkbox id="longSw" role="switch"><i></i></label>
+  <p class="muted">Weekly plan: Mon Develop A · Tue Light · Wed Develop B · Thu Light · Fri Develop A · Sat Light · Sun Develop B. Each area is stretched on 5+ days. Bar = weekly minutes; marker = 10 min floor, full bar = 20 min (the expert-consensus "highest you can sustain").</p></details>
  <label class="card rowcell">Rest between stretches <select id="rest"><option value="15">15 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></label>
  <small class="sh">Your routine · <span id="planFocus"></span></small>
  <ol id="planList" class="list"></ol>
  <p class="foot">Tap a stretch for the full how-to and demo.</p>
+ <details class="card"><summary>The science</summary><p id="evVer" class="muted"></p>
+  <p class="desc">Static or PNF holds of 30–60 s, 2–3 sets, spread over 5+ days a week, with about 10–20 min a week per area. Stretch to tight or mildly uncomfortable, never painful. Loaded slow lowering works as well as stretching (better with a real weight). Gains come mostly from tolerating the stretch better and fade if you stop. Stretching doesn't prevent injuries or speed recovery, and the app makes no such claims. Before runs: dynamic moves, no more than 60 s static per muscle. Variety is here to keep it interesting; the evidence doesn't say variety itself adds range.</p>
+  <ol id="evList" class="list ev"></ol><small>The evidence file is reviewed monthly; thresholds in the app come from it.</small></details>
  <details class="card"><summary>Apple Health</summary>
   <label>Shortcut name <input id="scName"></label>
   <label class="switch"><span>Log automatically at the end<small>Only once the Shortcut is installed</small></span><input type="checkbox" id="autoLog" role="switch"><i></i></label>
@@ -66,4 +72,4 @@
  <div id="charts"></div></section>
 <div class="dock"><button id="startBtn" class="primary">Start session</button></div>
 <nav id="tabbar" class="tabbar" role="tablist"><button id="tabHome" data-s="home" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M12 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM5 9l7 1 7-1M12 10v5l-4 6M12 15l4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Stretch</button><button id="testsBtn" data-s="tests"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Tests</button><button id="histBtn" data-s="history"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>History</button></nav>
-<script src="stretches.js"></script><script src="generator.js"></script><script src="develop.js"></script><script src="app.js"></script></body></html>
+<script src="evidence.js"></script><script src="stretches.js"></script><script src="library.js"></script><script src="generator.js"></script><script src="develop.js"></script><script src="app.js"></script></body></html>
