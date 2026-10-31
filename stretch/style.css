@@ -9,7 +9,7 @@ input,select,textarea{-webkit-user-select:auto;user-select:auto}
 a{text-decoration:none;color:inherit}
 body{margin:0;font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display","Helvetica Neue",system-ui,sans-serif;letter-spacing:-.01em;background:var(--bg);color:var(--label);
 -webkit-font-smoothing:antialiased;-webkit-text-size-adjust:100%}
-section{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column;gap:16px;background:var(--bg);
+section{position:absolute;inset:0;height:100%;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;display:flex;flex-direction:column;gap:16px;background:var(--bg);
  padding:calc(12px + env(safe-area-inset-top)) max(16px,calc((100% - 560px)/2),env(safe-area-inset-right)) calc(96px + env(safe-area-inset-bottom)) max(16px,calc((100% - 560px)/2),env(safe-area-inset-left))}
 section>*{flex:none}
 #player,#done{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
@@ -18,7 +18,7 @@ section.push{animation:push .38s cubic-bezier(.2,.85,.25,1)}section.pop{animatio
 @keyframes pop2{from{transform:translateX(-30%);opacity:.6}to{transform:none;opacity:1}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 /* tab bar: blur only on chrome */
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;padding:6px 0 calc(4px + env(safe-area-inset-bottom));background:rgba(249,249,249,.78);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep)}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;height:calc(50px + env(safe-area-inset-bottom));padding:6px 0 env(safe-area-inset-bottom);background:rgba(249,249,249,.78);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep)}
 @media (prefers-color-scheme:dark){.tabbar{background:rgba(22,22,22,.78)}}
 .tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:500;padding:2px 0;color:var(--label2);border-radius:0;letter-spacing:.01em}
 .tabbar svg{width:26px;height:26px}.tabbar button[aria-selected=true]{color:var(--blue)}
@@ -45,8 +45,11 @@ button:disabled{opacity:.35}
 .tinted{background:var(--tint);color:var(--blue);font-weight:600}
 .link{color:var(--blue);padding:8px;font-size:17px}
 .danger{color:var(--red)!important}.tinted.danger{background:rgba(255,59,48,.12)}
-.dock{position:sticky;bottom:calc(62px + env(safe-area-inset-bottom));z-index:5;padding-top:8px}
-.dock .primary{box-shadow:0 8px 24px rgba(0,0,0,.15)}
+.dock{position:fixed;left:0;right:0;bottom:calc(50px + env(safe-area-inset-bottom));z-index:19;display:none;padding:10px max(16px,calc((100% - 560px)/2)) 10px;background:rgba(242,242,247,.82);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+body.onhome .dock{display:block}
+@media (prefers-color-scheme:dark){.dock{background:rgba(0,0,0,.78)}}
+.dock .primary{box-shadow:none}
+#home{padding-bottom:calc(50px + 80px + 24px + env(safe-area-inset-bottom))}
 /* inputs */
 select,input:not([type=checkbox]):not([type=range]){font:inherit;background:var(--fill);color:var(--label);border:0;border-radius:8px;padding:8px}
 select{-webkit-appearance:none;appearance:none;padding-right:24px;background-image:linear-gradient(45deg,transparent 50%,var(--label2) 50%),linear-gradient(135deg,var(--label2) 50%,transparent 50%);background-position:calc(100% - 12px) 55%,calc(100% - 8px) 55%;background-size:4px 4px;background-repeat:no-repeat}

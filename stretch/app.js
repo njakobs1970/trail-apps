@@ -14,17 +14,25 @@ let routine=null, run=null, wakeLock=null, actx=null;
 function fmt(s){s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
 const DEPTH={home:0,tests:1,history:1,player:2,done:3};let curScreen=null;
 function show(id){const prev=curScreen;curScreen=id;document.querySelectorAll('section').forEach(x=>{if(x.id===id){x.hidden=false;x.scrollTop=0;x.classList.remove('push','pop','fade');void x.offsetWidth;if(prev)x.classList.add(prev===id?'fade':(DEPTH[id]>DEPTH[prev]?'push':DEPTH[id]<DEPTH[prev]?'pop':'fade'))}else x.hidden=true});
-  document.body.classList.toggle('playing',id==='player'||id==='done');document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-selected',b.dataset.s===id))}
+  document.body.classList.toggle('playing',id==='player'||id==='done');document.body.classList.toggle('onhome',id==='home');document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-selected',b.dataset.s===id))}
 
 // ---------- Audio ----------
-function beep(freq=880,dur=0.15){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=freq;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(0.3,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);o.start();o.stop(actx.currentTime+dur)}catch(e){} window.__beeps=(window.__beeps||0)+1}
-function unlockAudio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}catch(e){}
-  try{if('speechSynthesis' in window&&!window.__speechPrimed){const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);window.__speechPrimed=1}}catch(e){}}
-['pointerdown','touchend'].forEach(t=>document.addEventListener(t,unlockAudio,{passive:true}));
+function beep(freq=880,dur=0.15){try{const actx=ctx();if(actx.state==='suspended')actx.resume();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=freq;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(0.3,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);o.start();o.stop(actx.currentTime+dur)}catch(e){} window.__beeps=(window.__beeps||0)+1}
+function ctx(){if(!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}return actx}
+let clipBuf=null,clipBytes=null;
+fetch('ten-seconds.mp3').then(r=>r.arrayBuffer()).then(ab=>{clipBytes=ab;decodeClip()}).catch(()=>{});
+function decodeClip(){const c=ctx();if(!c||!clipBytes||clipBuf)return;try{const p=c.decodeAudioData(clipBytes.slice(0),b=>{clipBuf=b},()=>{});p&&p.catch&&p.catch(()=>{})}catch(e){}}
+function primeSpeech(){try{if(!('speechSynthesis' in window))return;speechSynthesis.resume();if(!window.__speechPrimed){const u=new SpeechSynthesisUtterance(' ');u.volume=0.01;u.lang='en-NZ';window.__keepU=u;speechSynthesis.speak(u);window.__speechPrimed=1}}catch(e){}}
+function unlockAudio(){const c=ctx();try{if(c){if(c.state!=='running')c.resume();const b=c.createBuffer(1,1,22050),src=c.createBufferSource();src.buffer=b;src.connect(c.destination);src.start(0)}}catch(e){}decodeClip();primeSpeech()}
+['pointerdown','touchend','click'].forEach(t=>document.addEventListener(t,unlockAudio,{passive:true,capture:true}));
 // ---------- Speech ----------
-let voice=null;function pickVoice(){try{const v=speechSynthesis.getVoices();voice=v.find(x=>/en[-_](NZ|AU|GB)/i.test(x.lang)&&x.localService)||v.find(x=>/^en/i.test(x.lang)&&x.localService)||v.find(x=>/^en/i.test(x.lang))||null}catch(e){}}
-if('speechSynthesis' in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
-function say(t){window.__spoken=(window.__spoken||[]).concat(t);try{if(!('speechSynthesis' in window))return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);if(voice)u.voice=voice;u.rate=1;u.volume=1;speechSynthesis.speak(u)}catch(e){}}
+let voice=null;function pickVoice(){try{const v=speechSynthesis.getVoices();voice=v.find(x=>/en[-_]NZ/i.test(x.lang))||v.find(x=>/en[-_](AU|GB)/i.test(x.lang))||v.find(x=>/^en/i.test(x.lang))||null}catch(e){}}
+if('speechSynthesis' in window){pickVoice();speechSynthesis.addEventListener&&speechSynthesis.addEventListener('voiceschanged',pickVoice)}
+function speak(t){try{if(!('speechSynthesis' in window))return false;speechSynthesis.resume();const u=new SpeechSynthesisUtterance(t);u.lang=voice?voice.lang:'en-NZ';if(voice)u.voice=voice;u.rate=1;u.volume=1;window.__keepU=u;
+  if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();setTimeout(()=>{speechSynthesis.resume();speechSynthesis.speak(u)},120)}else speechSynthesis.speak(u);return true}catch(e){return false}}
+function say(t){const c=ctx();if(c&&c.state==='suspended')try{c.resume()}catch(e){}
+  if(t==='Ten seconds to go'&&clipBuf&&c&&c.state==='running'){try{const s=c.createBufferSource(),g=c.createGain();g.gain.value=1;s.buffer=clipBuf;s.connect(g);g.connect(c.destination);s.start(0);window.__spoken=(window.__spoken||[]).concat('clip:'+t);return}catch(e){}}
+  window.__spoken=(window.__spoken||[]).concat('tts:'+t);speak(t)}
 const isRest=st=>st.type==='transition'||st.type==='switch'||(st.phase==='Rest');
 // ---------- Wake lock ----------
 async function lockScreen(){try{if('wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen');window.__wake='on'}else window.__wake='unsupported'}catch(e){window.__wake='error:'+e.name}}
@@ -93,7 +101,7 @@ function renderPlan(){
 }
 // ---------- Player ----------
 function start(){
-  beep(660,0.05); // unlock audio inside the user gesture
+  unlockAudio();beep(660,0.05); // unlock audio inside the user gesture
   lockScreen();
   run={i:0,stepEnd:0,paused:false,remainingAtPause:0,startedAt:Date.now()};
   enterStep(0);show('player');tick();
@@ -130,7 +138,7 @@ function tick(){
     const elapsedTotal=routine.steps.slice(0,run.i).reduce((a,s)=>a+s.secs,0)+(st.secs-rem);
     $('#pTotal').textContent=fmt(Gen.totalSec(routine.steps)-elapsedTotal)+' left';
     const c=Math.ceil(rem);const rest=isRest(st);
-    if(!rest&&st.secs>=15&&c===10&&!run.spoke10){run.spoke10=true;say('Ten seconds to go')}
+    if(!rest&&st.secs>=15&&rem<=10.05&&rem>3&&!run.spoke10){run.spoke10=true;say('Ten seconds to go')}
     if(c<=3&&c>0&&!run.beeped[c]&&st.secs>5){run.beeped[c]=1;beep(c===1?1046:880,0.12);window.__beepLog=(window.__beepLog||[]).concat((rest?'R':'A')+c);const t=$('#pTime');t.classList.remove('last3');void t.offsetWidth;t.classList.add('last3')} lastCount=c;
     if(rem<=0){ if(run.i+1<routine.steps.length)enterStep(run.i+1); else return finish(); }
   }
