@@ -150,6 +150,44 @@
    "version": "2026.11",
    "date": "2026-10-31",
    "change": "Peer review folded in (SCIENCE-REVIEW.md): hold cap 60 s default, frequency >=5 d/wk, weekly-time progression, RPE loads, looser overlap rule (0.7), pattern >=3x/wk, no injury/recovery claims, source fixes"
+  },
+  {
+   "version": "2026.11",
+   "date": "2026-10-31",
+   "change": "Test step-through guides with published protocols and noise thresholds (T1-T4)"
   }
- ]
+ ],
+ "testSources": [
+  {
+   "id": "T1",
+   "cite": "Powden, Hoch & Hoch 2015, Manual Therapy: reliability and MDC of the weight-bearing lunge (knee-to-wall) test, systematic review",
+   "url": "https://doi.org/10.1016/j.math.2015.01.004",
+   "used": "Protocol; ICC 0.65-0.99; MDC 1.6-1.9 cm (4.6-4.7 deg)"
+  },
+  {
+   "id": "T2",
+   "cite": "Mayorga-Vega et al. 2014, J Sports Sci Med: criterion validity of sit-and-reach tests, meta-analysis",
+   "url": "https://pmc.ncbi.nlm.nih.gov/articles/PMC3918544/",
+   "used": "Moderate validity for hamstrings (rp 0.46-0.67), low for lower back (0.16-0.35)"
+  },
+  {
+   "id": "T3",
+   "cite": "Vigotsky et al. 2016, PeerJ: modified Thomas test valid only when pelvic tilt is controlled",
+   "url": "https://doi.org/10.7717/peerj.2325",
+   "used": "Hug the opposite knee to fix the pelvis; uncontrolled test is unreliable"
+  },
+  {
+   "id": "T3b",
+   "cite": "Clapis, Davis & Davis 2008, Physiother Theory Pract: inclinometer/goniometer reliability of the modified Thomas test",
+   "url": "https://doi.org/10.1080/09593980701378256",
+   "used": "High inter-rater reliability (ICC 0.89-0.92) with a standard set-up"
+  },
+  {
+   "id": "T4",
+   "cite": "Hip internal rotation with a digital inclinometer, Knee Surg Sports Traumatol Arthrosc 2014",
+   "url": "https://doi.org/10.1007/s00167-014-3096-0",
+   "used": "Seated single-leg active IR with pelvic monitoring: ICC 0.84-0.93, MDC 5.4 deg"
+  }
+ ],
+ "testNoiseNote": "KTW and hip IR thresholds are published MDCs (T1, T4). Sit-and-reach 3 cm, ASLR 5 deg, hip ER 5 deg, Thomas 2 cm and straddle 3 cm are the app's own estimates (labelled in the guides)."
 }

@@ -140,3 +140,12 @@ details>summary::after{content:'›';margin-left:auto;color:var(--label3);font-s
 .restlbl b{font-size:22px;font-weight:700;letter-spacing:.02em}.restlbl span{font-size:17px;font-weight:600;color:var(--label)}
 .timer.last3{animation:thump .3s ease}@keyframes thump{0%{transform:scale(1.12)}100%{transform:none}}
 #player{min-height:0}
+
+.tglist li{display:block;padding:0}.tglist button{display:flex;width:100%;justify-content:space-between;align-items:center;color:var(--label);padding:14px 16px;min-height:56px;text-align:left}.tglist small{display:block;color:var(--label2)}.tglist .chev{color:var(--label2);font-size:22px}
+.dots{display:flex;gap:6px;justify-content:center;margin:14px 0 6px}.dots i{width:8px;height:8px;border-radius:50%;background:var(--label2);opacity:.3}.dots i.on{opacity:1;background:var(--blue)}
+#tgBody .bigstep{font-size:21px;line-height:1.4;font-weight:500;margin:12px 2px}#tgBody .stepno{font-size:15px;font-weight:600;color:var(--blue);text-transform:uppercase;letter-spacing:.04em}
+#tgBody .card p,#tgBody .card li{line-height:1.45}#tgBody .noise{border-left:4px solid var(--blue);padding-left:12px}
+#tgBody .stop{border-left:4px solid #ff3b30;padding-left:12px}
+#tgBody .rec label{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:17px;padding:10px 0}#tgBody .rec label span{white-space:nowrap}#tgBody .rec input,#tgBody .rec select{font-size:22px;width:6em;padding:10px;border-radius:10px}
+.tgnav{display:flex;gap:12px;position:fixed;left:0;right:0;bottom:calc(56px + env(safe-area-inset-bottom));padding:10px 16px;background:var(--bg);z-index:15;border-top:.5px solid var(--sep)}
+#tguide #tgBody{padding-bottom:110px}.tgnav button{flex:1;min-height:60px;font-size:18px;margin:0}

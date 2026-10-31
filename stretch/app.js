@@ -19,9 +19,9 @@ const TODAY={prerun:['Pre-run','prerun','Dynamic warm-up only (5–8 min). No lo
 let routine=null, run=null, wakeLock=null, actx=null;
 
 function fmt(s){s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
-const DEPTH={home:0,tests:1,history:1,player:2,done:3};let curScreen=null;
+const DEPTH={home:0,tests:1,history:1,tguide:2,player:2,done:3};let curScreen=null;
 function show(id){const prev=curScreen;curScreen=id;document.querySelectorAll('section').forEach(x=>{if(x.id===id){x.hidden=false;x.scrollTop=0;x.classList.remove('push','pop','fade');void x.offsetWidth;if(prev)x.classList.add(prev===id?'fade':(DEPTH[id]>DEPTH[prev]?'push':DEPTH[id]<DEPTH[prev]?'pop':'fade'))}else x.hidden=true});
-  document.body.classList.toggle('playing',id==='player'||id==='done');document.body.classList.toggle('onhome',id==='home');document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-selected',b.dataset.s===id))}
+  document.body.classList.toggle('playing',id==='player'||id==='done');document.body.classList.toggle('onhome',id==='home');document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-selected',b.dataset.s===(id==='tguide'?'tests':id)))}
 
 // ---------- Audio ----------
 function beep(freq=880,dur=0.15){try{const actx=ctx();if(actx.state==='suspended')actx.resume();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=freq;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(0.3,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);o.start();o.stop(actx.currentTime+dur)}catch(e){} window.__beeps=(window.__beeps||0)+1}
@@ -241,7 +241,40 @@ function renderTests(){
 }
 $('#saveTest').onclick=()=>{const r={date:new Date().toISOString()};document.querySelectorAll('#testForm [data-k]').forEach(el=>{if(el.value!=='')r[el.dataset.k]=Dev.TESTS[el.dataset.k].unit==='pass'?el.value==='1':Number(el.value)});
   if(Object.keys(r).length<2)return alert('Enter at least one result.');dev.tests.push(r);Dev.analyzeTests(dev);saveDev();renderTests();newRoutine()};
-$('#testsBtn').onclick=()=>{renderTests();show('tests')};$('#testDue').onclick=()=>{renderTests();show('tests')};$('#testsBack').onclick=()=>{newRoutine();show('home')};
+// ---------- Test step-through guides ----------
+let tg=null;
+function tgLast(k){for(let i=dev.tests.length-1;i>=0;i--){const v=dev.tests[i][k];if(v!=null&&v!=='')return {v,date:dev.tests[i].date}}return null}
+function tgFmt(k,v){const t=Dev.TESTS[k];return t.unit==='pass'?(v?'pass':'fail'):v+(t.unit==='°'?'°':' '+t.unit)}
+function renderTgList(){$('#tgList').innerHTML=TGUIDE.GUIDES.map(g=>{const l=g.keys.map(k=>{const x=tgLast(k);return x?tgFmt(k,x.v):null}).filter(Boolean);
+  return `<li><button type=button data-g="${g.id}"><span><b>${esc(g.title)}</b><small>${l.length?'Last: '+esc(l.join(' / ')):'Not recorded yet'} · ${g.steps.length} steps</small></span><span class=chev>›</span></button></li>`}).join('')}
+function openGuide(id){const g=TGUIDE.GUIDES.find(x=>x.id===id);tg={g,i:0,n:g.steps.length+3};renderGuide();show('tguide')}
+function srcLink(id){if(!id)return '<p class="muted">No published reliability study for this exact home version; our own protocol.</p>';const s=(Dev.E.testSources||[]).filter(x=>x.id===id||x.id.startsWith(id));return s.map(x=>`<p class="muted">Method: <a href="${esc(x.url)}" target="_blank" rel="noopener">${esc(x.cite)}</a></p>`).join('')}
+function fig(id){const s=STRETCHES.find(x=>x.id===id);return s?demoSVG(s,'demo'):''}
+function renderGuide(){const {g,i,n}=tg;const last=n-1;$('#tgTitle').textContent=g.title;$('#tgCount').textContent=`${i+1} of ${n}`;
+  $('#tgDots').innerHTML=Array.from({length:n},(_,k)=>`<i class="${k===i?'on':''}"></i>`).join('');
+  let h='';
+  if(i===0)h=`<div class="card"><p><b>What it measures:</b> ${esc(g.what)}</p><p><b>Why:</b> ${esc(g.why)}</p></div>
+   <div class="card"><b>You need</b><ul class="desc">${g.equip.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+   <div class="card"><b>Keep it the same every time</b><ul class="desc">${TGUIDE.STD.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+   <div class="card stop"><b>Stop if…</b><p>${esc(TGUIDE.STOP)}</p></div>${srcLink(g.src)}`;
+  else if(i<=g.steps.length){const st=g.steps[i-1];h=`<div class="stepno">Step ${i} of ${g.steps.length}${g.sides?' · each side':''}</div><div class="demowrap">${fig(st.fig)}</div><p class="bigstep">${esc(st.t)}</p>`}
+  else if(i===last-1)h=`<div class="card"><b>How to measure precisely</b><p>${esc(g.measure)}</p></div>
+   <div class="card"><b>Common mistakes</b><ul class="desc">${g.mistakes.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>
+   <div class="card stop"><b>Stop if…</b><p>${esc(TGUIDE.STOP)}</p></div>`;
+  else{h=`<div class="card rec"><b>Record your best of 3</b>${g.keys.map(k=>{const t=Dev.TESTS[k],l=tgLast(k);const lab=t.name.replace(/\s*\(.*\)/,'');
+     return `<label>${esc(lab)}${t.unit==='pass'?`<select data-tk="${k}"><option value="">—</option><option value="1">Pass</option><option value="0">Fail</option></select>`:`<span><input type=number inputmode=decimal step=0.5 data-tk="${k}"> ${t.unit}</span>`}</label>${l?`<small>Last: ${tgFmt(k,l.v)} (${new Date(l.date).toLocaleDateString()})${t.target!=null&&t.unit!=='pass'?` · target ${t.lower?'≤ ':''}${t.target}`:''}</small>`:''}`}).join('')}</div>
+   <div class="card noise"><b>Is the change real?</b><p>A change smaller than <b>${esc(g.noise)}</b> is within measurement error, so it isn't real yet. Look for changes bigger than that, or the same direction over two retests.</p></div>
+   <p id="tgMsg" class="muted"></p>`}
+  $('#tgBody').innerHTML=h;$('#tgPrev').disabled=i===0;$('#tgNext').textContent=i===last?'Save result':i===last-1?'Record result ›':'Next ›';$('#tguide').scrollTop=0}
+function saveGuide(){const vals={};document.querySelectorAll('#tgBody [data-tk]').forEach(el=>{if(el.value!=='')vals[el.dataset.tk]=Dev.TESTS[el.dataset.tk].unit==='pass'?el.value==='1':Number(el.value)});
+  if(!Object.keys(vals).length){$('#tgMsg').textContent='Enter at least one number.';return}
+  const today=Dev.dayKey(Date.now());let r=dev.tests.length&&Dev.dayKey(new Date(dev.tests[dev.tests.length-1].date).getTime())===today?dev.tests[dev.tests.length-1]:null;
+  if(!r){r={date:new Date().toISOString()};dev.tests.push(r)}Object.assign(r,vals);Dev.analyzeTests(dev);saveDev();renderTests();renderTgList();show('tests')}
+$('#tgList').onclick=e=>{const b=e.target.closest('button[data-g]');if(b)openGuide(b.dataset.g)};
+$('#tgBack').onclick=()=>{renderTests();renderTgList();show('tests')};
+$('#tgPrev').onclick=()=>{if(tg.i>0){tg.i--;renderGuide()}};
+$('#tgNext').onclick=()=>{if(tg.i<tg.n-1){tg.i++;renderGuide()}else saveGuide()};
+$('#testsBtn').onclick=()=>{renderTests();renderTgList();show('tests')};$('#testDue').onclick=()=>{renderTests();renderTgList();show('tests')};$('#testsBack').onclick=()=>{newRoutine();show('home')};
 $('#testSc').onclick=()=>fire(shortcutURL(1));
 bindSettings();newRoutine();renderEvidence();show('home');
 if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js');

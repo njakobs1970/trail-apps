@@ -67,9 +67,13 @@
 <section id="tests" hidden><nav class="navbar"><button id="testsBack" class="link">‹ Back</button></nav><h1 class="large">Progress tests</h1>
  <p id="testDueMsg" class="muted"></p>
  <details class="card"><summary>How to do each test</summary><ol id="testHow" class="desc"></ol></details>
- <div id="testForm" class="card testform"></div><button id="saveTest" class="primary">Save results</button>
+ <small class="sh">Step-by-step guides · tap a test</small><ul id="tgList" class="list tglist"></ul>
+ <small class="sh">Quick entry</small><div id="testForm" class="card testform"></div><button id="saveTest" class="primary">Save results</button>
  <div class="card"><b>What changed</b><ul id="testNotes" class="desc"></ul><small>Changes under 2 cm / 5° count as noise. Two flat retests in a row → +25% volume, then a method switch. Target met → maintenance and the next weakest area is promoted.</small></div>
  <div id="charts"></div></section>
+<section id="tguide" hidden><nav class="navbar"><button id="tgBack" class="link">‹ Tests</button><span id="tgCount" class="muted"></span></nav>
+ <h1 id="tgTitle" class="large"></h1><div id="tgDots" class="dots" aria-hidden="true"></div><div id="tgBody"></div>
+ <div class="tgnav"><button id="tgPrev" class="tinted">‹ Back</button><button id="tgNext" class="primary">Next ›</button></div></section>
 <div class="dock"><button id="startBtn" class="primary">Start session</button></div>
 <nav id="tabbar" class="tabbar" role="tablist"><button id="tabHome" data-s="home" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M12 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM5 9l7 1 7-1M12 10v5l-4 6M12 15l4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Stretch</button><button id="testsBtn" data-s="tests"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Tests</button><button id="histBtn" data-s="history"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>History</button></nav>
-<script src="evidence.js"></script><script src="stretches.js"></script><script src="library.js"></script><script src="generator.js"></script><script src="develop.js"></script><script src="app.js"></script></body></html>
+<script src="evidence.js"></script><script src="stretches.js"></script><script src="library.js"></script><script src="generator.js"></script><script src="develop.js"></script><script src="testguide.js"></script><script src="app.js"></script></body></html>
