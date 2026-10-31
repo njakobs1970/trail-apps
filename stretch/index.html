@@ -1,12 +1,12 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default"><meta name="apple-mobile-web-app-title" content="Stretch by Bot">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="Stretch by Bot">
 <meta name="theme-color" content="#f2f2f7" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)"><meta name="color-scheme" content="light dark"><meta name="format-detection" content="telephone=no"><link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png"><link rel="icon" href="icon.svg">
 <title>Stretch by Bot</title><link rel="stylesheet" href="style.css"></head><body>
 <section id="home">
- <nav class="navbar"><span></span><span class="navbtns"><button id="testsBtn" class="link">Tests</button><button id="histBtn" class="link">History</button></span></nav>
+ 
  <h1 class="large">Stretch by Bot</h1>
  <small class="sh">Time available</small><div class="card timebar"><div class="tb-top"><span>Session length</span><b id="capLbl">Full session</b></div>
   <input type="range" id="cap" min="5" max="45" step="5" value="45" aria-label="Time available in minutes">
@@ -40,6 +40,7 @@
  <div class="top"><span id="pStep"></span><span id="pTotal"></span></div>
  <div id="pPhase"></div><h2 id="pName"></h2>
  <div id="pDemo" class="demowrap"></div>
+ <div id="pRest" class="restlbl" hidden><b>Rest</b><span id="pRestNext"></span></div>
  <div class="ringwrap" id="pBarWrap"><svg class="ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="54"/><circle id="pBar" class="prog" cx="60" cy="60" r="54" pathLength="100"/></svg><div id="pTime" class="timer">0:00</div></div>
  <div id="rateBox" class="card" hidden><p id="rateQ"></p><div id="rateBtns" class="ratebtns"></div><label class="chk"><input type=checkbox id="pain"> Sharp or joint pain (not just stretch)</label><p id="rateMsg" class="muted"></p></div>
  <p id="pNext" class="muted next"></p>
@@ -64,4 +65,5 @@
  <div id="testForm" class="card testform"></div><button id="saveTest" class="primary">Save results</button>
  <div class="card"><b>What changed</b><ul id="testNotes" class="desc"></ul><small>Changes under 2 cm / 5° count as noise. Two flat retests in a row → +25% volume, then a method switch. Target met → maintenance and the next weakest area is promoted.</small></div>
  <div id="charts"></div></section>
+<nav id="tabbar" class="tabbar" role="tablist"><button id="tabHome" data-s="home" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M12 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM5 9l7 1 7-1M12 10v5l-4 6M12 15l4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Stretch</button><button id="testsBtn" data-s="tests"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Tests</button><button id="histBtn" data-s="history"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>History</button></nav>
 <script src="stretches.js"></script><script src="generator.js"></script><script src="develop.js"></script><script src="app.js"></script></body></html>

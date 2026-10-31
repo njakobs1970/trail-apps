@@ -12,10 +12,20 @@ const TODAY={prerun:['Pre-run','prerun','Dynamic warm-up only (5–8 min). No lo
 let routine=null, run=null, wakeLock=null, actx=null;
 
 function fmt(s){s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
-function show(id){document.querySelectorAll('section').forEach(x=>x.hidden=x.id!==id);window.scrollTo(0,0)}
+const DEPTH={home:0,tests:1,history:1,player:2,done:3};let curScreen=null;
+function show(id){const prev=curScreen;curScreen=id;document.querySelectorAll('section').forEach(x=>{if(x.id===id){x.hidden=false;x.scrollTop=0;x.classList.remove('push','pop','fade');void x.offsetWidth;if(prev)x.classList.add(prev===id?'fade':(DEPTH[id]>DEPTH[prev]?'push':DEPTH[id]<DEPTH[prev]?'pop':'fade'))}else x.hidden=true});
+  document.body.classList.toggle('playing',id==='player'||id==='done');document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-selected',b.dataset.s===id))}
 
 // ---------- Audio ----------
 function beep(freq=880,dur=0.15){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=freq;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(0.3,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);o.start();o.stop(actx.currentTime+dur)}catch(e){} window.__beeps=(window.__beeps||0)+1}
+function unlockAudio(){try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();if(actx.state==='suspended')actx.resume();const b=actx.createBuffer(1,1,22050),src=actx.createBufferSource();src.buffer=b;src.connect(actx.destination);src.start(0)}catch(e){}
+  try{if('speechSynthesis' in window&&!window.__speechPrimed){const u=new SpeechSynthesisUtterance(' ');u.volume=0;speechSynthesis.speak(u);window.__speechPrimed=1}}catch(e){}}
+['pointerdown','touchend'].forEach(t=>document.addEventListener(t,unlockAudio,{passive:true}));
+// ---------- Speech ----------
+let voice=null;function pickVoice(){try{const v=speechSynthesis.getVoices();voice=v.find(x=>/en[-_](NZ|AU|GB)/i.test(x.lang)&&x.localService)||v.find(x=>/^en/i.test(x.lang)&&x.localService)||v.find(x=>/^en/i.test(x.lang))||null}catch(e){}}
+if('speechSynthesis' in window){pickVoice();speechSynthesis.onvoiceschanged=pickVoice}
+function say(t){window.__spoken=(window.__spoken||[]).concat(t);try{if(!('speechSynthesis' in window))return;speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(t);if(voice)u.voice=voice;u.rate=1;u.volume=1;speechSynthesis.speak(u)}catch(e){}}
+const isRest=st=>st.type==='transition'||st.type==='switch'||(st.phase==='Rest');
 // ---------- Wake lock ----------
 async function lockScreen(){try{if('wakeLock' in navigator){wakeLock=await navigator.wakeLock.request('screen');window.__wake='on'}else window.__wake='unsupported'}catch(e){window.__wake='error:'+e.name}}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&run&&!run.paused)lockScreen()});
@@ -96,7 +106,9 @@ function enterStep(i){
   run.stepEnd=performance.now()+st.secs*1000/SPEED;
   const ex=st.ex||st.next;
   $('#pPhase').textContent=st.type==='rate'?'Rate this block':(st.phase?(st.side?st.side+' · ':'')+st.phase:st.type==='hold'?(st.side?st.side+' side':'Hold'):st.label);
-  $('#pPhase').className=st.type;
+  $('#pPhase').className=st.type;run.spoke10=false;run.beeped={};
+  const rest=isRest(st)&&st.type!=='rate';$('#player').classList.toggle('rest',rest);$('#pRest').hidden=!rest;
+  if(rest){const nx=st.next||st.ex;$('#pRest').querySelector('b').textContent=st.type==='switch'?'Rest · Switch sides':'Rest';$('#pRestNext').textContent=st.type==='switch'?'Next up: '+nx.name+' (Right)':'Next up: '+nx.name}
   if(st.type==='rate'){$('#rateQ').textContent=`How uncomfortable was “${st.block}”? 0 = nothing, 10 = worst`;$('#pain').checked=false;$('#rateMsg').textContent=''}
   $('#pName').textContent=ex.icon+' '+ex.name;
   if($('#pDemo').dataset.id!==ex.id){$('#pDemo').innerHTML=demoSVG(ex);$('#pDemo').dataset.id=ex.id;$('#pDesc').innerHTML=fullDesc(ex);$('#pCue').textContent=ex.cue}
@@ -117,7 +129,9 @@ function tick(){
     $('#pBar').style.strokeDashoffset=(100*Math.max(0,rem/st.secs)).toFixed(2);
     const elapsedTotal=routine.steps.slice(0,run.i).reduce((a,s)=>a+s.secs,0)+(st.secs-rem);
     $('#pTotal').textContent=fmt(Gen.totalSec(routine.steps)-elapsedTotal)+' left';
-    const c=Math.ceil(rem); if(c<=3&&c>0&&c!==lastCount&&st.type==='hold'&&st.secs>5){beep(440,0.08)} lastCount=c;
+    const c=Math.ceil(rem);const rest=isRest(st);
+    if(!rest&&st.secs>=15&&c===10&&!run.spoke10){run.spoke10=true;say('Ten seconds to go')}
+    if(c<=3&&c>0&&!run.beeped[c]&&st.secs>5){run.beeped[c]=1;beep(c===1?1046:880,0.12);window.__beepLog=(window.__beepLog||[]).concat((rest?'R':'A')+c);const t=$('#pTime');t.classList.remove('last3');void t.offsetWidth;t.classList.add('last3')} lastCount=c;
     if(rem<=0){ if(run.i+1<routine.steps.length)enterStep(run.i+1); else return finish(); }
   }
   run.raf=setTimeout(tick,SPEED>1?20:200);
@@ -181,7 +195,7 @@ $('#regen').onclick=newRoutine;$('#startBtn').onclick=start;$('#pauseBtn').oncli
 $('#rateBtns').innerHTML=[...Array(11).keys()].map(n=>`<button type=button data-n=${n}>${n}</button>`).join('');$('#rateBtns').onclick=e=>{const b=e.target.closest('button');if(b&&run&&run.waiting){run.waiting=false;rate(+b.dataset.n)}};
 $('#stopBtn').onclick=()=>{if(confirm('End session now and save what you did?'))stop(true)};
 $('#homeBtn').onclick=()=>{newRoutine();show('home')};
-$('#histBtn').onclick=()=>{renderHistory();show('history')};$('#backBtn').onclick=()=>show('home');
+$('#histBtn').onclick=()=>{renderHistory();show('history')};$('#tabHome').onclick=()=>{if(curScreen!=='home'){newRoutine();show('home')}};$('#backBtn').onclick=()=>show('home');
 $('#clearHist').onclick=()=>{if(confirm('Delete all history?')){LS.set('history',[]);renderHistory()}};
 function exportData(){return {app:'stretch15',exported:new Date().toISOString(),settings,history:LS.get('history',[]),dev}}
 $('#exportHist').onclick=()=>{const b=new Blob([JSON.stringify(exportData(),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='stretch-backup.json';a.click()};
