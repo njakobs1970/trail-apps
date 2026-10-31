@@ -19,9 +19,9 @@ const TODAY={prerun:['Pre-run','prerun','Dynamic warm-up only (5–8 min). No lo
 let routine=null, run=null, wakeLock=null, actx=null;
 
 function fmt(s){s=Math.max(0,Math.ceil(s));return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
-const DEPTH={home:0,tests:1,history:1,tguide:2,player:2,done:3};let curScreen=null;
+const DEPTH={home:0,picker:1,tests:1,history:1,tguide:2,player:2,done:3};let curScreen=null;
 function show(id){const prev=curScreen;curScreen=id;document.querySelectorAll('section').forEach(x=>{if(x.id===id){x.hidden=false;x.scrollTop=0;x.classList.remove('push','pop','fade');void x.offsetWidth;if(prev)x.classList.add(prev===id?'fade':(DEPTH[id]>DEPTH[prev]?'push':DEPTH[id]<DEPTH[prev]?'pop':'fade'))}else x.hidden=true});
-  document.body.classList.toggle('playing',id==='player'||id==='done');document.body.classList.toggle('onhome',id==='home');document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-selected',b.dataset.s===(id==='tguide'?'tests':id)))}
+  document.body.classList.toggle('playing',id==='player'||id==='done');document.body.classList.toggle('onhome',id==='home');document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-selected',b.dataset.s===(id==='tguide'?'tests':id==='picker'?'home':id)))}
 
 // ---------- Audio ----------
 function beep(freq=880,dur=0.15){try{const actx=ctx();if(actx.state==='suspended')actx.resume();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=freq;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(0.3,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);o.start();o.stop(actx.currentTime+dur)}catch(e){} window.__beeps=(window.__beeps||0)+1}
@@ -101,10 +101,33 @@ function renderDev(){
   $('#loads').innerHTML=loads.map(id=>`<label>${STRETCHES.find(x=>x.id===id).name} load <input type=number min=0 step=0.5 data-load="${id}" value="${dev.loads[id]||0}" style="width:5em"> kg</label>`).join('');
   $('#devNote').textContent=`${routine.plan?routine.plan.label+' · ':''}Week ${routine.week}${routine.deload?' · DELOAD week (volume cut ~40%)':''}${routine.areasToday&&routine.areasToday.length?' · PNF today: '+routine.areasToday.map(a=>Dev.AREAS[a].name).join(', '):''}`;
 }
+const TYPE_DESC={plan:'Follows the weekly plan: Develop A/B and Light days, adjusted after long runs.',develop:'Full progressive session: PNF, loaded and end-range work.',light:'Relaxed static holds across all your areas.',prerun:'Dynamic warm-up only. No long static holds before running.',topup:'One hold per priority area.',relax:'Slower, longer holds to wind down for sleep.',random:'A random mix for a chosen focus.'};
+function capLabel(){return settings.cap?'Up to '+settings.cap+' min':'Full session'}
+function restLabel(){return settings.restMode==='tap'?'Tap to continue':'Timed '+(settings.rest||30)+' s'}
+function renderHero(){const d=new Date();$('#heroDay').textContent=d.toLocaleDateString(undefined,{weekday:'long'})+' · '+TODAY[settings.today][0];
+  $('#heroTitle').textContent=routine.label;
+  $('#heroMeta').textContent=fmt(settings.restMode==='tap'?activeSec(routine.steps):Gen.totalSec(routine.steps))+(settings.restMode==='tap'?' + rests':'')+' · '+routine.items.length+' moves';
+  const ar=(routine.areasToday||[]).filter(a=>Dev.AREAS[a]);$('#heroChips').innerHTML=(ar.length?ar.map(a=>Dev.AREAS[a].name.replace(/\s*\(.*\)/,'')):[routine.focus&&Gen.FOCUSES[routine.focus]||'']).filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('');
+  $('#heroGuide').textContent=TODAY[settings.today][2];
+  $('#optRows').innerHTML=[['today','Today',TODAY[settings.today][0]],['type','Session',TYPES[settings.type]],['length','Length',capLabel()],['rest','Rest',restLabel()]].map(([k,l,v])=>`<li><button type=button data-p="${k}"><span>${l}</span><span class=val>${esc(v)}</span></button></li>`).join('')}
+let pk=null;
+function openPicker(k){const P={
+  today:['Today',"What's your day? The plan adjusts around runs.",Object.entries(TODAY).map(([v,x])=>[v,x[0],x[2],settings.today===v])],
+  type:['Session','',Object.entries(TYPES).map(([v,x])=>[v,x,TYPE_DESC[v],settings.type===v])],
+  length:['Length','Longer sessions are trimmed to fit, lowest-value blocks first.',[0,5,10,15,20,25,30,35,40].map(v=>[v,v?v+' min':'Full session',v?'':'No time limit',(settings.cap||0)===v])],
+  rest:['Rest','Between stretches, side switches and set-ups.',[15,30,45,60].map(v=>['t'+v,'Timed '+v+' s','Counts down, then moves on automatically',settings.restMode!=='tap'&&(settings.rest||30)===v]).concat([['tap','Tap to continue','Waits until you tap Continue',settings.restMode==='tap']])]}[k];
+  pk=k;$('#pkTitle').textContent=P[0];$('#pkNote').textContent=P[1];
+  $('#pkList').innerHTML=P[2].map(([v,t,d,on])=>`<li><button type=button data-v="${v}"><span>${esc(t)}${d?`<small>${esc(d)}</small>`:''}</span><span class=ck>${on?'✓':''}</span></button></li>`).join('');show('picker')}
+function pickVal(v){
+  if(pk==='today'){settings.today=v;settings.type=TODAY[v][1];if(v==='longrun')settings.lastLong=Dev.dayKey(Date.now())}
+  else if(pk==='type')settings.type=v;
+  else if(pk==='length'){settings.cap=Number(v);$('#cap').value=settings.cap||45}
+  else if(pk==='rest'){if(v==='tap')settings.restMode='tap';else{settings.restMode='timed';settings.rest=Number(v.slice(1));$('#rest').value=settings.rest}renderRestMode()}
+  LS.set('settings',settings);newRoutine();show('home')}
 function renderPlan(){
-  $('#planTotal').textContent=fmt(Gen.totalSec(routine.steps));
+  $('#planTotal').textContent=fmt(settings.restMode==='tap'?activeSec(routine.steps):Gen.totalSec(routine.steps));$('#planRests').textContent=settings.restMode==='tap'?' · + rests (tap to continue)':'';
   $('#planCount').textContent=routine.items.length;
-  $('#planFocus').textContent=routine.label;renderDev();renderEquip();
+  $('#planFocus').textContent=routine.label;renderDev();renderEquip();renderHero();
   document.querySelectorAll('#focusChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===settings.focus));
   let lastB='';$('#planList').innerHTML=routine.items.map((s,i)=>`${s.block&&s.block!==lastB?`<li class="blk">${esc(lastB=s.block)}</li>`:''}<li><details><summary><span class=ic>${s.icon}</span><div><b>${i+1}. ${esc(s.name)}</b><small>${s.planNote?esc(s.planNote):`${s.sides?'L + R · ':''}${s.hold}s${s.sides?' each':''} · ${s.area.join(', ')}`}</small><span class="sum">${esc(s.cue)}</span></div></summary>${demoSVG(s,'demo small')}${fullDesc(s)}</details></li>`).join('');
 }
@@ -127,6 +150,7 @@ function enterStep(i){
   const rest=isRest(st)&&st.type!=='rate';$('#player').classList.toggle('rest',rest);$('#pRest').hidden=!rest;
   if(rest){const nx=st.next||st.ex;$('#pRest').querySelector('b').textContent=st.type==='switch'?'Rest · Switch sides':'Rest';$('#pRestNext').textContent=st.type==='switch'?'Next up: '+nx.name+' (Right)':'Next up: '+nx.name}
   if(st.type==='rate'){$('#rateQ').textContent=st.rate.kind==='loaded'?`How hard was “${st.block}”? 0 = easy, 10 = max effort`:`How uncomfortable was “${st.block}”? 0 = nothing, 10 = worst`;$('#pain').checked=false;$('#rateMsg').textContent=''}
+  run.tapWait=tapRest(st);if(run.tapWait)run.restStart=performance.now();setTapUI();
   $('#pName').textContent=ex.icon+' '+ex.name;
   if($('#pDemo').dataset.id!==ex.id){$('#pDemo').innerHTML=demoSVG(ex);$('#pDemo').dataset.id=ex.id;$('#pDesc').innerHTML=fullDesc(ex);$('#pCue').textContent=ex.cue}
   $('#pStep').textContent=`Step ${i+1}/${routine.steps.length}`;
@@ -137,15 +161,29 @@ function enterStep(i){
   if(st.kg>0&&st.type!=='rate')$('#pName').textContent=ex.icon+' '+ex.name+' · '+st.kg+' kg';
 }
 let lastCount=null;
+const tapRest=st=>settings.restMode==='tap'&&!!st&&isRest(st)&&st.type!=='rate';
+function activeSec(steps){return steps.reduce((a,s)=>a+(settings.restMode==='tap'&&isRest(s)?0:s.secs),0)}
+function setTapUI(){const on=!!(run&&run.tapWait);$('#contBtn').hidden=!on;$('#player').classList.toggle('tapwait',on);
+  $('#restQuick').hidden=!(run&&isRest(routine.steps[run.i]));$('#restQuick').textContent=settings.restMode==='tap'?'Switch to timed rests':'Switch to tap-to-continue rests';
+  if(on){$('#pBar').style.strokeDashoffset='0';$('#pRest').querySelector('b').textContent=(routine.steps[run.i].type==='switch'?'Rest · Switch sides':'Rest')+' · tap Continue'}}
+function cont(){if(!run)return;if(run.paused)togglePause();if(run.i+1<routine.steps.length)enterStep(run.i+1);else finish()}
+function restQuick(){settings.restMode=settings.restMode==='tap'?'timed':'tap';LS.set('settings',settings);renderRestMode();if(!run)return;const st=routine.steps[run.i];
+  if(settings.restMode==='tap'&&isRest(st)){run.tapWait=true;run.restStart=performance.now()}else if(run.tapWait){run.tapWait=false;run.stepEnd=performance.now()+st.secs*1000/SPEED;run.beeped={}}setTapUI()}
+function renderRestMode(){const r=settings.rest||30;$('#restMode').innerHTML=`<button type=button data-m="timed" aria-pressed="${settings.restMode!=='tap'}">Timed ${r}s</button><button type=button data-m="tap" aria-pressed="${settings.restMode==='tap'}">Tap to continue</button>`;
+  $('#restRow').hidden=settings.restMode==='tap'}
 function tick(){
   if(!run)return;
-  if(!run.paused&&!run.waiting){
+  if(!run.paused&&!run.waiting&&run.tapWait){
+    const el=(performance.now()-run.restStart)*SPEED/1000;$('#pTime').textContent=fmt(el);$('#pBar').style.strokeDashoffset='0';
+    $('#pTotal').textContent=fmt(activeSec(routine.steps.slice(run.i+1)))+' left + rests';
+  } else if(!run.paused&&!run.waiting){
     const rem=(run.stepEnd-performance.now())*SPEED/1000;
     $('#pTime').textContent=fmt(rem);
     const st=routine.steps[run.i];
     $('#pBar').style.strokeDashoffset=(100*Math.max(0,rem/st.secs)).toFixed(2);
-    const elapsedTotal=routine.steps.slice(0,run.i).reduce((a,s)=>a+s.secs,0)+(st.secs-rem);
-    $('#pTotal').textContent=fmt(Gen.totalSec(routine.steps)-elapsedTotal)+' left';
+    if(settings.restMode==='tap')$('#pTotal').textContent=fmt(activeSec(routine.steps.slice(run.i+1))+(isRest(st)?0:Math.max(0,rem)))+' left + rests';
+    else{const elapsedTotal=routine.steps.slice(0,run.i).reduce((a,s)=>a+s.secs,0)+(st.secs-rem);
+    $('#pTotal').textContent=fmt(Gen.totalSec(routine.steps)-elapsedTotal)+' left';}
     const c=Math.ceil(rem);const rest=isRest(st);
     if(!rest&&st.secs>=15&&rem<=10.05&&rem>3&&!run.spoke10){run.spoke10=true;say('Ten seconds to go')}
     if(c<=3&&c>0&&!run.beeped[c]&&st.secs>5){run.beeped[c]=1;beep(c===1?1046:880,0.12);window.__beepLog=(window.__beepLog||[]).concat((rest?'R':'A')+c);const t=$('#pTime');t.classList.remove('last3');void t.offsetWidth;t.classList.add('last3')} lastCount=c;
@@ -188,7 +226,7 @@ function renderHistory(){
 }
 // ---------- Wiring ----------
 function bindSettings(){
-  $('#rest').value=settings.rest||30;$('#rest').onchange=()=>{settings.rest=Number($('#rest').value);save();newRoutine()};$('#scName').value=settings.shortcut;$('#autoLog').checked=settings.autoLog;
+  $('#rest').value=settings.rest||30;$('#rest').onchange=()=>{settings.rest=Number($('#rest').value);save();renderRestMode();newRoutine()};renderRestMode();$('#restMode').onclick=e=>{const b=e.target.closest('button[data-m]');if(!b)return;settings.restMode=b.dataset.m;LS.set('settings',settings);renderRestMode();newRoutine()};$('#scName').value=settings.shortcut;$('#autoLog').checked=settings.autoLog;
   const save=()=>{settings={...settings,shortcut:$('#scName').value.trim()||'Log Stretch',autoLog:$('#autoLog').checked};LS.set('settings',settings)};
   $('#scReady').onclick=()=>{healthReady();$('#logBtn').click()};$('#scSkip').onclick=()=>show('home');
   const capLbl=()=>{const el=$('#cap'),v=Number(el.value);$('#capLbl').textContent=v>=45?'Full session':'Up to '+v+' min';el.style.setProperty('--p',((v-5)/40*100)+'%')};
@@ -208,6 +246,7 @@ function bindSettings(){
   $('#loads').onchange=e=>{const id=e.target.dataset.load;if(!id)return;dev.loads[id]=Math.max(0,Number(e.target.value)||0);saveDev();newRoutine()};
   ['#scName','#autoLog'].forEach(s=>$(s).addEventListener('change',save));
 }
+$('#contBtn').onclick=cont;$('#optRows').onclick=e=>{const b=e.target.closest('button[data-p]');if(b)openPicker(b.dataset.p)};$('#pkList').onclick=e=>{const b=e.target.closest('button[data-v]');if(b){b.querySelector('.ck').textContent='✓';setTimeout(()=>pickVal(b.dataset.v),120)}};$('#pkBack').onclick=()=>show('home');$('#restQuick').onclick=restQuick;
 $('#regen').onclick=()=>{regen++;newRoutine()};$('#maintSw').onchange=e=>{settings.maintenance=e.target.checked;LS.set('settings',settings);newRoutine()};$('#longSw').onchange=e=>{settings.longHolds=e.target.checked;LS.set('settings',settings);newRoutine()};$('#startBtn').onclick=start;$('#pauseBtn').onclick=togglePause;$('#skipBtn').onclick=skip;$('#backBtnP').onclick=prev;
 $('#rateBtns').innerHTML=[...Array(11).keys()].map(n=>`<button type=button data-n=${n}>${n}</button>`).join('');$('#rateBtns').onclick=e=>{const b=e.target.closest('button');if(b&&run&&run.waiting){run.waiting=false;rate(+b.dataset.n)}};
 $('#stopBtn').onclick=()=>{if(confirm('End session now and save what you did?'))stop(true)};

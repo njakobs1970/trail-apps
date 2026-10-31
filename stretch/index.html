@@ -8,17 +8,19 @@
 <section id="home">
  
  <h1 class="large">Stretch by Bot</h1>
- <small class="sh">Time available</small><div class="card timebar"><div class="tb-top"><span>Session length</span><b id="capLbl">Full session</b></div>
+ <div id="hero" class="card hero"><small id="heroDay"></small><h2 id="heroTitle"></h2><p id="heroMeta"></p><div id="heroChips" class="achips"></div><p id="heroGuide"></p></div>
+ <ul id="optRows" class="list rows"></ul>
+ <div class="legacy" hidden><small class="sh">Time available</small><div class="card timebar"><div class="tb-top"><span>Session length</span><b id="capLbl">Full session</b></div>
   <input type="range" id="cap" min="5" max="45" step="5" value="45" aria-label="Time available in minutes">
-  <div class="tb-ticks"><span>5 min</span><span>15</span><span>25</span><span>35</span><span>Full</span></div></div>
+  <div class="tb-ticks"><span>5 min</span><span>15</span><span>25</span><span>35</span><span>Full</span></div></div></div>
  <button id="testDue" class="ghost due" hidden>📏 Progress test due · Tap to record</button>
- <div><small class="sh">Today</small><div id="todayChips" class="chips" role="group" aria-label="Today"></div></div>
+ <div class="legacy" hidden><div><small class="sh">Today</small><div id="todayChips" class="chips" role="group" aria-label="Today"></div></div>
  <div><small class="sh">Session type</small><div id="typeChips" class="chips" role="group" aria-label="Session type"></div></div>
- <p id="guide" class="muted"></p>
+ <p id="guide" class="muted"></p></div>
  <small class="sh">Equipment</small><div id="equipPanel" class="card"><div id="equipList"></div><small id="equipSwaps"></small>
   <label class="switch"><span>Bodyweight only (wall &amp; floor)</span><input type=checkbox class="noEquip" id="noEquipTop" role="switch"><i></i></label>
   <details><summary>Equipment I own</summary><div id="ownList"></div><small>Moves needing anything unticked are swapped for bodyweight versions automatically.</small></details></div>
- <div class="card row"><div><big id="planTotal">15:00</big><small><span id="planCount"></span> stretches</small></div>
+ <div class="card row"><div><big id="planTotal">15:00</big><small><span id="planCount"></span> stretches<span id="planRests"></span></small></div>
   <button id="regen" class="tinted" aria-label="New routine">↻ New routine</button></div>
  <div id="focusBox"><small class="sh">Focus · trail running first</small><div id="focusChips" class="chips" role="group" aria-label="Focus"></div></div>
  <details id="devBox" class="card"><summary>Develop · areas, progress &amp; loads</summary>
@@ -28,7 +30,8 @@
   <label class="switch"><span>Maintenance mode<small>Light holds every day at the 10 min/week floor. Gains fade if you stop completely.</small></span><input type=checkbox id="maintSw" role="switch"><i></i></label>
   <label class="switch"><span>Allow longer holds (up to 90 s)<small>Default cap is 60 s; weekly time matters more than hold length.</small></span><input type=checkbox id="longSw" role="switch"><i></i></label>
   <p class="muted">Weekly plan: Mon Develop A · Tue Light · Wed Develop B · Thu Light · Fri Develop A · Sat Light · Sun Develop B. Each area is stretched on 5+ days. Bar = weekly minutes; marker = 10 min floor, full bar = 20 min (the expert-consensus "highest you can sustain").</p></details>
- <label class="card rowcell">Rest between stretches <select id="rest"><option value="15">15 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></label>
+ <div class="legacy" hidden><small class="sh">Rest between stretches &amp; sides</small><div id="restMode" class="chips" role="group" aria-label="Rest mode"></div>
+ <label id="restRow" class="card rowcell">Timed rest length <select id="rest"><option value="15">15 s</option><option value="30">30 s</option><option value="45">45 s</option><option value="60">60 s</option></select></label></div>
  <small class="sh">Your routine · <span id="planFocus"></span></small>
  <ol id="planList" class="list"></ol>
  <p class="foot">Tap a stretch for the full how-to and demo.</p>
@@ -45,12 +48,12 @@
  <div class="top"><span id="pStep"></span><span id="pTotal"></span></div>
  <div id="pPhase"></div><h2 id="pName"></h2>
  <div id="pDemo" class="demowrap"></div>
- <div id="pRest" class="restlbl" hidden><b>Rest</b><span id="pRestNext"></span></div>
+ <div id="pRest" class="restlbl" hidden><b>Rest</b><span id="pRestNext"></span><button type=button id="restQuick" class="link small" hidden></button></div>
  <div class="ringwrap" id="pBarWrap"><svg class="ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="54"/><circle id="pBar" class="prog" cx="60" cy="60" r="54" pathLength="100"/></svg><div id="pTime" class="timer">0:00</div></div>
  <div id="rateBox" class="card" hidden><p id="rateQ"></p><div id="rateBtns" class="ratebtns"></div><label class="chk"><input type=checkbox id="pain"> Sharp or joint pain (not just stretch)</label><p id="rateMsg" class="muted"></p></div>
  <p id="pNext" class="muted next"></p>
  <div class="controls"><button id="stopBtn" class="ghost danger">End</button><button id="backBtnP" class="ghost">‹ Back</button><button id="pauseBtn" class="primary">Pause</button><button id="skipBtn" class="ghost">Skip ›</button></div>
- <p id="pCue" class="cue"></p><div id="pDesc"></div>
+ <button type=button id="contBtn" class="primary contbtn" hidden>Continue ›</button><p id="pCue" class="cue"></p><div id="pDesc"></div>
 </section>
 <section id="done" hidden><div class="check" aria-hidden="true">✓</div><h1 class="large">Session complete</h1><p id="doneMsg"></p>
  <a id="logBtn" class="primary btn" href="#">❤️ Log to Apple Health</a>
@@ -74,6 +77,7 @@
 <section id="tguide" hidden><nav class="navbar"><button id="tgBack" class="link">‹ Tests</button><span id="tgCount" class="muted"></span></nav>
  <h1 id="tgTitle" class="large"></h1><div id="tgDots" class="dots" aria-hidden="true"></div><div id="tgBody"></div>
  <div class="tgnav"><button id="tgPrev" class="tinted">‹ Back</button><button id="tgNext" class="primary">Next ›</button></div></section>
+<section id="picker" hidden><nav class="navbar"><button id="pkBack" class="link">‹ Back</button></nav><h1 id="pkTitle" class="large"></h1><p id="pkNote" class="muted"></p><ul id="pkList" class="list rows pick"></ul></section>
 <div class="dock"><button id="startBtn" class="primary">Start session</button></div>
 <nav id="tabbar" class="tabbar" role="tablist"><button id="tabHome" data-s="home" aria-selected="true"><svg viewBox="0 0 24 24"><path d="M12 3a2 2 0 1 1 0 4 2 2 0 0 1 0-4zM5 9l7 1 7-1M12 10v5l-4 6M12 15l4 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Stretch</button><button id="testsBtn" data-s="tests"><svg viewBox="0 0 24 24"><path d="M4 19V5M4 19h16M8 15l4-5 3 3 5-6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>Tests</button><button id="histBtn" data-s="history"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>History</button></nav>
 <script src="evidence.js"></script><script src="stretches.js"></script><script src="library.js"></script><script src="generator.js"></script><script src="develop.js"></script><script src="testguide.js"></script><script src="app.js"></script></body></html>
