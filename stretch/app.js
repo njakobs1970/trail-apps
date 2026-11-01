@@ -24,7 +24,7 @@ function show(id){const prev=curScreen;curScreen=id;document.querySelectorAll('s
   document.body.classList.toggle('playing',id==='player'||id==='done');document.body.classList.toggle('onhome',id==='home');document.querySelectorAll('#tabbar button').forEach(b=>b.setAttribute('aria-selected',b.dataset.s===(id==='tguide'?'tests':id==='picker'?'home':id)))}
 
 // ---------- Audio ----------
-function beep(freq=880,dur=0.15){try{const actx=ctx();if(actx.state==='suspended')actx.resume();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=freq;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(0.3,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);o.start();o.stop(actx.currentTime+dur)}catch(e){} window.__beeps=(window.__beeps||0)+1}
+function beep(freq=880,dur=0.15,vol=0.3){try{const actx=ctx();if(actx.state==='suspended')actx.resume();const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=freq;o.connect(g);g.connect(actx.destination);g.gain.setValueAtTime(vol,actx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,actx.currentTime+dur);o.start();o.stop(actx.currentTime+dur)}catch(e){} window.__beeps=(window.__beeps||0)+1}
 function ctx(){if(!actx){try{actx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){}}return actx}
 let clipBuf=null,clipBytes=null;
 fetch('ten-seconds.mp3').then(r=>r.arrayBuffer()).then(ab=>{clipBytes=ab;decodeClip()}).catch(()=>{});
@@ -38,7 +38,7 @@ if('speechSynthesis' in window){pickVoice();speechSynthesis.addEventListener&&sp
 function speak(t){try{if(!('speechSynthesis' in window))return false;speechSynthesis.resume();const u=new SpeechSynthesisUtterance(t);u.lang=voice?voice.lang:'en-NZ';if(voice)u.voice=voice;u.rate=1;u.volume=1;window.__keepU=u;
   if(speechSynthesis.speaking||speechSynthesis.pending){speechSynthesis.cancel();setTimeout(()=>{speechSynthesis.resume();speechSynthesis.speak(u)},120)}else speechSynthesis.speak(u);return true}catch(e){return false}}
 function say(t){const c=ctx();if(c&&c.state==='suspended')try{c.resume()}catch(e){}
-  if(t==='Ten seconds to go'&&clipBuf&&c&&c.state==='running'){try{const s=c.createBufferSource(),g=c.createGain();g.gain.value=1;s.buffer=clipBuf;s.connect(g);g.connect(c.destination);s.start(0);window.__spoken=(window.__spoken||[]).concat('clip:'+t);return}catch(e){}}
+  if(t==='ten secs'&&clipBuf&&c&&c.state==='running'){try{const s=c.createBufferSource(),g=c.createGain();g.gain.value=1;s.buffer=clipBuf;s.connect(g);g.connect(c.destination);s.start(0);window.__spoken=(window.__spoken||[]).concat('clip:'+t);return}catch(e){}}
   window.__spoken=(window.__spoken||[]).concat('tts:'+t);speak(t)}
 const isRest=st=>st.type==='transition'||st.type==='switch'||(st.phase==='Rest');
 // ---------- Wake lock ----------
@@ -185,8 +185,8 @@ function tick(){
     else{const elapsedTotal=routine.steps.slice(0,run.i).reduce((a,s)=>a+s.secs,0)+(st.secs-rem);
     $('#pTotal').textContent=fmt(Gen.totalSec(routine.steps)-elapsedTotal)+' left';}
     const c=Math.ceil(rem);const rest=isRest(st);
-    if(!rest&&st.secs>=15&&rem<=10.05&&rem>3&&!run.spoke10){run.spoke10=true;say('Ten seconds to go')}
-    if(c<=3&&c>0&&!run.beeped[c]&&st.secs>5){run.beeped[c]=1;beep(c===1?1046:880,0.12);window.__beepLog=(window.__beepLog||[]).concat((rest?'R':'A')+c);const t=$('#pTime');t.classList.remove('last3');void t.offsetWidth;t.classList.add('last3')} lastCount=c;
+    if(!rest&&st.secs>=15&&rem<=10.05&&rem>3&&!run.spoke10){run.spoke10=true;say('ten secs')}
+    if(c<=3&&c>0&&!run.beeped[c]&&st.secs>5){run.beeped[c]=1;c===1?beep(1046,0.2,0.55):beep(880,0.12);window.__beepLog=(window.__beepLog||[]).concat((rest?'R':'A')+c);const t=$('#pTime');t.classList.remove('last3');void t.offsetWidth;t.classList.add('last3')} lastCount=c;
     if(rem<=0){ if(run.i+1<routine.steps.length)enterStep(run.i+1); else return finish(); }
   }
   run.raf=setTimeout(tick,SPEED>1?20:200);
