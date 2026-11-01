@@ -328,7 +328,19 @@ $('#tgNext').onclick=()=>{if(tg.i<tg.n-1){tg.i++;renderGuide()}else saveGuide()}
 $('#testsBtn').onclick=()=>{renderTests();renderTgList();show('tests')};$('#testDue').onclick=()=>{renderTests();renderTgList();show('tests')};$('#testsBack').onclick=()=>{newRoutine();show('home')};
 $('#testSc').onclick=()=>fire(shortcutURL(1));
 bindSettings();newRoutine();renderEvidence();show('home');
-if('serviceWorker' in navigator&&location.protocol!=='file:')navigator.serviceWorker.register('sw.js');
+// ---------- Version + reliable updates ----------
+(function(){const V=self.VERSION||0,el=$('#ver');if(el)el.textContent='v'+V;
+  const busy=()=>curScreen==='player';let pending=false;
+  const doReload=()=>{if(busy()){pending=true;return}const k='swReloadAt';const last=Number(sessionStorage.getItem(k)||0);if(Date.now()-last<10000){pending=true;return}sessionStorage.setItem(k,Date.now());location.reload()};
+  setInterval(()=>{if(pending&&!busy()){pending=false;doReload()}},1000);
+  if(!('serviceWorker' in navigator)||location.protocol==='file:')return;
+  const hadCtl=!!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange',()=>{if(hadCtl||window.__forceReload)doReload()});
+  navigator.serviceWorker.register('sw.js',{updateViaCache:'none'}).then(reg=>{window.__swReg=reg;const up=()=>reg.update().catch(()=>{});up();
+    document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')up()});window.addEventListener('pageshow',up);
+    if(el)el.onclick=async()=>{el.textContent='checking…';window.__forceReload=true;try{await reg.update()}catch(e){}
+      setTimeout(()=>{if(!reg.installing&&!reg.waiting){if(!busy())location.reload();else el.textContent='v'+V}},2500)}}).catch(()=>{});
+})();
 
 // ---------- Haptic-like feedback ----------
 document.addEventListener('pointerdown',e=>{const b=e.target.closest('button,.btn,summary,.switch');if(!b)return;b.classList.add('tap');try{navigator.vibrate&&navigator.vibrate(8)}catch{}},{passive:true});

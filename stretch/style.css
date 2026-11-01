@@ -175,3 +175,5 @@ details>summary::after{content:'›';margin-left:auto;color:var(--label3);font-s
 .hrow .hminus::after{content:'';position:absolute;left:5px;right:5px;top:10px;height:2px;background:#fff;border-radius:1px}
 .list.editing .hminus{display:block}
 .hrow.open .hbody{transform:translateX(-88px)}
+
+.ver{font-size:13px;font-weight:400;color:var(--label2,#8e8e93);background:none;border:0;padding:0 0 0 4px;letter-spacing:0;vertical-align:middle;opacity:.8}
