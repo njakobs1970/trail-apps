@@ -1,4 +1,4 @@
-:root{--sb:max(0px,calc(env(safe-area-inset-bottom) - 30px))}
+:root{--sb:0px;--tabh:44px}
 :root{color-scheme:light dark;--bg:#f2f2f7;--card:#fff;--fill:rgba(118,118,128,.12);--sep:rgba(60,60,67,.18);--label:#000;--label2:rgba(60,60,67,.6);--label3:rgba(60,60,67,.3);
 --accent:#34c759;--accentOn:#fff;--blue:#007aff;--orange:#ff9500;--red:#ff3b30;--indigo:#5856d6;--tint:rgba(0,122,255,.12);--ring:rgba(118,118,128,.16);--r:12px;--shadow:0 1px 0 rgba(0,0,0,.02)}
 @media (prefers-color-scheme:dark){:root{--bg:#000;--card:#1c1c1e;--fill:rgba(118,118,128,.24);--sep:rgba(84,84,88,.6);--label:#fff;--label2:rgba(235,235,245,.6);--label3:rgba(235,235,245,.3);
@@ -19,7 +19,7 @@ section.push{animation:push .38s cubic-bezier(.2,.85,.25,1)}section.pop{animatio
 @keyframes pop2{from{transform:translateX(-30%);opacity:.6}to{transform:none;opacity:1}}
 @keyframes fade{from{opacity:0}to{opacity:1}}
 /* tab bar: blur only on chrome */
-.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;height:calc(50px + var(--sb));padding:6px 0 var(--sb);background:rgba(249,249,249,.78);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep)}
+.tabbar{position:fixed;left:0;right:0;bottom:0;z-index:20;display:flex;justify-content:space-around;height:var(--tabh);padding:0;background:rgba(249,249,249,.78);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px);border-top:.5px solid var(--sep)}
 @media (prefers-color-scheme:dark){.tabbar{background:rgba(22,22,22,.78)}}
 .tabbar button{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;font-weight:500;padding:2px 0;color:var(--label2);border-radius:0;letter-spacing:.01em}
 .tabbar svg{width:26px;height:26px}.tabbar button[aria-selected=true]{color:var(--blue)}
@@ -46,11 +46,11 @@ button:disabled{opacity:.35}
 .tinted{background:var(--tint);color:var(--blue);font-weight:600}
 .link{color:var(--blue);padding:8px;font-size:17px}
 .danger{color:var(--red)!important}.tinted.danger{background:rgba(255,59,48,.12)}
-.dock{position:fixed;left:0;right:0;bottom:calc(50px + var(--sb));z-index:19;display:none;padding:10px max(16px,calc((100% - 560px)/2)) 10px;background:rgba(242,242,247,.82);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
+.dock{position:fixed;left:0;right:0;bottom:var(--tabh);z-index:19;display:none;padding:10px max(16px,calc((100% - 560px)/2)) 10px;background:rgba(242,242,247,.82);-webkit-backdrop-filter:saturate(180%) blur(20px);backdrop-filter:saturate(180%) blur(20px)}
 body.onhome .dock{display:block}
 @media (prefers-color-scheme:dark){.dock{background:rgba(0,0,0,.78)}}
 .dock .primary{box-shadow:none}
-#home{padding-bottom:calc(50px + 80px + 24px + var(--sb))}
+#home{padding-bottom:calc(var(--tabh) + 80px + 24px)}
 /* inputs */
 select,input:not([type=checkbox]):not([type=range]){font:inherit;background:var(--fill);color:var(--label);border:0;border-radius:8px;padding:8px}
 select{-webkit-appearance:none;appearance:none;padding-right:24px;background-image:linear-gradient(45deg,transparent 50%,var(--label2) 50%),linear-gradient(135deg,var(--label2) 50%,transparent 50%);background-position:calc(100% - 12px) 55%,calc(100% - 8px) 55%;background-size:4px 4px;background-repeat:no-repeat}
@@ -148,7 +148,7 @@ details>summary::after{content:'›';margin-left:auto;color:var(--label3);font-s
 #tgBody .card p,#tgBody .card li{line-height:1.45}#tgBody .noise{border-left:4px solid var(--blue);padding-left:12px}
 #tgBody .stop{border-left:4px solid #ff3b30;padding-left:12px}
 #tgBody .rec label{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:17px;padding:10px 0}#tgBody .rec label span{white-space:nowrap}#tgBody .rec input,#tgBody .rec select{font-size:22px;width:6em;padding:10px;border-radius:10px}
-.tgnav{display:flex;gap:12px;position:fixed;left:0;right:0;bottom:calc(56px + var(--sb));padding:10px 16px;background:var(--bg);z-index:15;border-top:.5px solid var(--sep)}
+.tgnav{display:flex;gap:12px;position:fixed;left:0;right:0;bottom:calc(var(--tabh) + 6px);padding:10px 16px;background:var(--bg);z-index:15;border-top:.5px solid var(--sep)}
 #tguide #tgBody{padding-bottom:110px}.tgnav button{flex:1;min-height:60px;font-size:18px;margin:0}
 
 .contbtn{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));width:auto;z-index:30;background:var(--orange);color:#fff;font-size:20px;min-height:64px;box-shadow:0 6px 20px rgba(255,149,0,.35)}
