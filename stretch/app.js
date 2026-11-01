@@ -218,12 +218,24 @@ function finish(early){
 function healthReady(){settings.healthReady=true;LS.set('settings',settings);$('#healthSetup').hidden=true;$('#logBtn').hidden=false}
 function fire(url){window.__shortcutCalls=(window.__shortcutCalls||[]).concat(url);try{location.href=url}catch(e){}}
 
+let histEdit=false;
 function renderHistory(){
   const h=LS.get('history',[]);
-  $('#histList').innerHTML=h.length?h.map(x=>`<li><b>${new Date(x.date).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}</b> — ${x.minutes} min${x.focusName?' · '+x.focusName:''}${x.complete?'':' (stopped early)'}${x.logged?' · ❤️ Health':''}<small>${x.stretches.join(' · ')}</small></li>`).join(''):'<li>No sessions yet.</li>';
-  const week=h.filter(x=>Date.now()-new Date(x.date)<7*864e5).reduce((a,x)=>a+x.minutes,0);
+  $('#histList').classList.toggle('editing',histEdit&&h.length>0);$('#histEdit').textContent=histEdit?'Done':'Edit';$('#histEdit').hidden=!h.length;
+  $('#histList').innerHTML=h.length?h.map((x,i)=>`<li class="hrow" data-i="${i}"><button class="hminus" data-del="${i}" aria-label="Delete session"></button><div class="hbody"><b>${new Date(x.date).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}</b> — ${x.minutes} min${x.focusName?' · '+x.focusName:''}${x.complete?'':' (stopped early)'}${x.logged?' · ❤️ Health':''}<small>${(x.stretches||[]).join(' · ')}</small></div><button class="hdel" data-del="${i}">Delete</button></li>`).join(''):'<li>No sessions yet.</li>';
+  const week=h.filter(x=>Date.now()-new Date(x.date)<7*864e5).reduce((a,x)=>a+(x.minutes||0),0);
   $('#histWeek').textContent=week+' min in the last 7 days';
 }
+function deleteSession(i){const h=LS.get('history',[]);const x=h[i];if(!x)return;
+  if(!confirm('Delete the session from '+new Date(x.date).toLocaleString([], {dateStyle:'medium',timeStyle:'short'})+'?')){renderHistory();return}
+  h.splice(i,1);LS.set('history',h);if(!h.length)histEdit=false;renderHistory();try{newRoutine()}catch(e){}}
+(function(){const L=$('#histList');let sx=0,sy=0,row=null,dx=0,drag=false;
+  const close=except=>L.querySelectorAll('.hrow.open').forEach(r=>{if(r!==except){r.classList.remove('open');r.querySelector('.hbody').style.transform=''}});
+  L.addEventListener('click',e=>{const d=e.target.closest('[data-del]');if(d){e.stopPropagation();if(d.classList.contains('hminus')){const r=d.closest('.hrow');close(r);r.classList.add('open');return}deleteSession(Number(d.dataset.del));return}close(null)});
+  L.addEventListener('touchstart',e=>{row=e.target.closest('.hrow');if(!row||histEdit)return;sx=e.touches[0].clientX;sy=e.touches[0].clientY;dx=0;drag=false;close(row)},{passive:true});
+  L.addEventListener('touchmove',e=>{if(!row||histEdit)return;const mx=e.touches[0].clientX-sx,my=e.touches[0].clientY-sy;if(!drag&&Math.abs(mx)>10&&Math.abs(mx)>Math.abs(my))drag=true;if(!drag)return;const base=row.classList.contains('open')?-88:0;dx=Math.min(0,Math.max(-120,base+mx));row.querySelector('.hbody').style.transition='none';row.querySelector('.hbody').style.transform=`translateX(${dx}px)`},{passive:true});
+  L.addEventListener('touchend',()=>{if(!row||!drag){row=null;return}const b=row.querySelector('.hbody');b.style.transition='';const open=dx<-44;row.classList.toggle('open',open);b.style.transform=open?'translateX(-88px)':'';row=null});
+})();
 // ---------- Wiring ----------
 function bindSettings(){
   $('#rest').value=settings.rest||30;$('#rest').onchange=()=>{settings.rest=Number($('#rest').value);save();renderRestMode();newRoutine()};renderRestMode();$('#restMode').onclick=e=>{const b=e.target.closest('button[data-m]');if(!b)return;settings.restMode=b.dataset.m;LS.set('settings',settings);renderRestMode();newRoutine()};$('#scName').value=settings.shortcut;$('#autoLog').checked=settings.autoLog;
@@ -251,8 +263,8 @@ $('#regen').onclick=()=>{regen++;newRoutine()};$('#maintSw').onchange=e=>{settin
 $('#rateBtns').innerHTML=[...Array(11).keys()].map(n=>`<button type=button data-n=${n}>${n}</button>`).join('');$('#rateBtns').onclick=e=>{const b=e.target.closest('button');if(b&&run&&run.waiting){run.waiting=false;rate(+b.dataset.n)}};
 $('#stopBtn').onclick=()=>{if(confirm('End session now and save what you did?'))stop(true)};
 $('#homeBtn').onclick=()=>{newRoutine();show('home')};
-$('#histBtn').onclick=()=>{renderHistory();show('history')};$('#tabHome').onclick=()=>{if(curScreen!=='home'){newRoutine();show('home')}};$('#backBtn').onclick=()=>show('home');
-$('#clearHist').onclick=()=>{if(confirm('Delete all history?')){LS.set('history',[]);renderHistory()}};
+$('#histBtn').onclick=()=>{histEdit=false;renderHistory();show('history')};$('#tabHome').onclick=()=>{if(curScreen!=='home'){newRoutine();show('home')}};$('#backBtn').onclick=()=>show('home');
+$('#clearHist').onclick=()=>{if(confirm('Delete all history?')){LS.set('history',[]);histEdit=false;renderHistory();try{newRoutine()}catch(e){}}};$('#histEdit').onclick=()=>{histEdit=!histEdit;$('#histList').querySelectorAll('.hrow.open').forEach(r=>{r.classList.remove('open');r.querySelector('.hbody').style.transform=''});renderHistory()};
 function exportData(){return {app:'stretch15',exported:new Date().toISOString(),settings,history:LS.get('history',[]),dev}}
 $('#exportHist').onclick=()=>{const b=new Blob([JSON.stringify(exportData(),null,1)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='stretch-backup.json';a.click()};
 function importData(o){if(Array.isArray(o))o={history:o};if(o.history)LS.set('history',o.history);if(o.dev){dev=Dev.migrate({...o.dev});saveDev()}if(o.settings){settings={...settings,...o.settings};LS.set('settings',settings)}bindSettings();newRoutine();renderHistory();renderTests()}
