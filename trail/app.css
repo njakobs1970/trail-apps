@@ -97,6 +97,7 @@ select{appearance:none;-webkit-appearance:none;border:0;border-radius:var(--r-s)
 .brand-t{flex:1;min-width:0}
 .brand h1{font-size:var(--fs-head);font-weight:650;letter-spacing:-.01em}
 .brand p{font-size:var(--fs-cap);color:var(--text3);letter-spacing:.01em}
+.brand h1 .ver,.wmark .ver{font-size:12px;font-weight:500;color:var(--text3);letter-spacing:0;margin-left:4px;opacity:.85}
 .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1px;border-radius:var(--r);overflow:hidden;background:var(--sep)}
 .stat{background:var(--glass-solid);padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
 .stat .lbl{font-size:var(--fs-cap);font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em}
