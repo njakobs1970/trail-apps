@@ -494,3 +494,8 @@ body.v3d .cmp-group{display:none}
 .dropzone{position:fixed;inset:12px;z-index:3000;border:3px dashed var(--accent);border-radius:18px;background:rgba(0,113,227,.08);display:grid;place-items:center;pointer-events:none}
 .dropzone[hidden]{display:none}
 .dropzone div{background:var(--glass-solid);color:var(--accent);font-weight:650;padding:12px 18px;border-radius:12px;box-shadow:var(--shadow-s)}
+
+/* Km markers: small white discs with a dark number; never take clicks; upright when rotated */
+.kmk{pointer-events:none!important;display:grid;place-items:center;width:20px;height:20px}
+.kmk span{min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#fff;color:#1d1d1f;border:1.5px solid rgba(29,29,31,.8);font:700 10px/15px var(--font);text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.35);letter-spacing:-.02em}
+.km-chip{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1.5px solid currentColor;font-size:9px;font-weight:700;line-height:1}

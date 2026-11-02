@@ -571,7 +571,7 @@ function render() {
   $("eMax").innerHTML = isFinite(hi) ? `${Math.round(hi)} <small>m</small>` : "–";
   $("eTime").textContent = dist > 0 ? fmtDur(naismith(dist, cs.total, pace)) : "–";
   $("exp").disabled = pts.length < 2; $("undo").disabled = !anchors.length; $("ret").disabled = anchors.length < 2; $("saveBtn").disabled = $("saveBtn2").disabled = !anchors.length && !wpts.length;
-  drawProfile(prof); renderCues(); if (on3d) upd3d();
+  drawProfile(prof); renderCues(); drawKm(); if (on3d) upd3d();
 }
 let renderQueued = false;
 const renderSoon = () => { if (renderQueued) return; renderQueued = true; requestAnimationFrame(() => { renderQueued = false; render() }) };
@@ -611,6 +611,16 @@ function drawProfile(prof) {
     x.fillText(lbl, Math.max(L0 - 4, Math.min(xx - w / 2, W - R0 - w)), H - (big ? 8 : 4));
   }
   x.strokeStyle = css("--c-axis"); x.beginPath(); x.moveTo(L0, Math.round(BY) + .5); x.lineTo(W - R0, Math.round(BY) + .5); x.stroke();
+  // faint km lines (labels thinned so they never crowd), under the profile
+  if (kmOn && D >= 1000) {
+    const pk = (W - L0 - R0) / (D / 1000), ls = [1, 2, 5, 10, 20, 50, 100].find(s => s * pk >= 6) || 100, lb = [1, 2, 5, 10, 20, 50, 100].find(s => s >= ls && s * pk >= 26) || 100;
+    x.save(); x.strokeStyle = css("--c-grid"); x.setLineDash([2, 3]); x.globalAlpha = .9; x.font = chartFont(9, 600); x.textAlign = "center"; x.textBaseline = "top";
+    for (let k = ls; k * 1000 < D; k += ls) {
+      const xx = Math.round(X(k * 1000)) + .5; x.beginPath(); x.moveTo(xx, T + (k % lb ? 0 : 11)); x.lineTo(xx, BY); x.stroke();
+      if (!(k % lb)) { x.fillStyle = css("--c-label"); x.fillText(String(k), xx, T) }
+    }
+    x.restore();
+  }
   // continuous runs with elevation; gaps are shaded
   const runs = []; let run = []; prof.forEach(p => { if (p[1] == null) { if (run.length) runs.push(run); run = [] } else run.push(p) }); if (run.length) runs.push(run);
   x.fillStyle = css("--c-gap");
@@ -643,6 +653,25 @@ function updLegend() {
   $("legend").innerHTML = GB.map(b => `<span><i style="background:${b[1]}"></i>${b[2]}</span>`).join("") + `<span><i style="background:${gCol(null)}"></i>No data</span>`;
   $("legend").classList.toggle("off", !gOn);
 }
+
+
+/* 7b. Km markers (map, chart, 3D): numbered by distance along the line, thinned by zoom/length */
+let kmOn = store.get("tp-km") !== "off";
+const kmLayer = L.layerGroup().addTo(map), KM_STEPS = [1, 2, 5, 10, 20, 50, 100];
+function kmPoints(step) {
+  const P = SC.pts, C = SC.cum, o = []; if (P.length < 2) return o;
+  let i = 0; for (let k = step; k * 1000 < SC.D; k += step) {
+    const d = k * 1000; while (i < C.length - 2 && C[i + 1] < d) i++;
+    const t = (d - C[i]) / ((C[i + 1] - C[i]) || 1); o.push({ k, ll: [P[i][0] + (P[i + 1][0] - P[i][0]) * t, P[i][1] + (P[i + 1][1] - P[i][1]) * t] });
+  } return o;
+}
+function kmStep2d() { const c = map.getCenter(), a = map.latLngToContainerPoint(c), b = map.latLngToContainerPoint(L.latLng(c.lat, c.lng + 1000 / (111320 * Math.cos(c.lat * RAD)))); const px = Math.hypot(b.x - a.x, b.y - a.y); return KM_STEPS.find(s => s * px >= 34) || 100 }
+function drawKm() {
+  kmLayer.clearLayers(); if (!kmOn || SC.D < 1000) return;
+  for (const p of kmPoints(kmStep2d())) L.marker(p.ll, { interactive: false, keyboard: false, icon: L.divIcon({ className: "kmk", html: `<span>${p.k}</span>`, iconSize: [20, 20], iconAnchor: [10, 10] }) }).addTo(kmLayer);
+}
+map.on("zoomend", drawKm);
+function setKm(on) { kmOn = on; const b = $("kmTog"); b.classList.toggle("on", on); b.setAttribute("aria-pressed", on); store.set("tp-km", on ? "" : "off"); drawKm(); drawProfile(SC.prof); if (on3d) upd3d() }
 
 /* 8. Scrub along the trail ------------------------------------------------------ */
 // SC.pos = metres from start (null = no marker)
@@ -975,7 +1004,7 @@ addEventListener("keydown", e => {
   const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   const act = {
     s: () => setMode("snap"), f: () => setMode("free"), w: () => setMode("wpt"), e: exportGpx, i: () => $("impFile").click(),
-    g: () => setGrade(!gOn), c: () => setTab(tab === "cues" ? "ele" : "cues"), p: () => setPanel(!document.body.classList.contains("pcol")), l: () => map.locate({ enableHighAccuracy: true }),
+    g: () => setGrade(!gOn), m: () => setKm(!kmOn), c: () => setTab(tab === "cues" ? "ele" : "cues"), p: () => setPanel(!document.body.classList.contains("pcol")), l: () => map.locate({ enableHighAccuracy: true }),
     "3": () => set3d(!on3d), "[": () => on3d ? rot3d(-ROT_STEP) : rot2d(-ROT2_STEP), "]": () => on3d ? rot3d(ROT_STEP) : rot2d(ROT2_STEP),
     ArrowUp: on3d ? () => tilt3d(TILT_STEP) : null, ArrowDown: on3d ? () => tilt3d(-TILT_STEP) : null, n: () => on3d ? reset3d() : north2d(), k: on3d ? toggleOrbit : null, "+": () => on3d ? m3.zoomIn() : map.zoomIn(), "=": () => on3d ? m3.zoomIn() : map.zoomIn(), "-": () => on3d ? m3.zoomOut() : map.zoomOut(), "?": () => $("help").showModal(),
     ArrowRight: SC.pts.length > 1 ? () => stepScrub(1, e.shiftKey) : null, ArrowLeft: SC.pts.length > 1 ? () => stepScrub(-1, e.shiftKey) : null,
@@ -989,7 +1018,7 @@ addEventListener("keydown", e => {
  * MapLibre GL is loaded from the CDN on first use. Terrain: AWS Terrarium DEM tiles. Base: the current
  * Leaflet basemap as a raster source. Leaflet stays the editor and is never moved, so 2D comes back as it was. */
 const ML_VER = "4.7.1", ML_CDN = `https://unpkg.com/maplibre-gl@${ML_VER}/dist/`;
-let m3 = null, on3d = false, m3Wmk = [];
+let m3 = null, on3d = false, m3Wmk = [], m3Km = [];
 const hasGL = () => { try { const c = document.createElement("canvas"); return !!(window.WebGLRenderingContext && (c.getContext("webgl2") || c.getContext("webgl"))) } catch (e) { return false } };
 function loadML() {
   if (window.maplibregl) return Promise.resolve();
@@ -1016,6 +1045,7 @@ function upd3d() {
   m3.getSource("route").setData(route3dData());
   const s = SC.pos != null ? scrubState(SC.pos) : null;
   m3.getSource("scrub").setData({ type: "FeatureCollection", features: s ? [{ type: "Feature", properties: {}, geometry: { type: "Point", coordinates: [s.ll[1], s.ll[0]] } }] : [] });
+  m3Km.forEach(m => m.remove()); m3Km = !kmOn ? [] : kmPoints(KM_STEPS.find(s => SC.D / 1000 / s <= 15) || 100).map(p => { const e = document.createElement("div"); e.className = "kmk"; e.innerHTML = `<span>${p.k}</span>`; return new maplibregl.Marker({ element: e }).setLngLat([p.ll[1], p.ll[0]]).addTo(m3) });
   m3Wmk.forEach(m => m.remove()); m3Wmk = wpts.map(w => { const e = document.createElement("div"); e.className = "w3d"; e.title = w.name || wType(w.type).label; const t = wType(w.type); e.style.background = t.color || ""; e.innerHTML = icon(t.icon || "i-flag"); return new maplibregl.Marker({ element: e, anchor: "bottom" }).setLngLat([w.lng, w.lat]).addTo(m3) });
 }
 function fit3d() {
@@ -1214,7 +1244,8 @@ async function importFiles(files) {
   addEventListener("drop", e => { if (!has(e)) return; e.preventDefault(); n = 0; z.hidden = true; importFiles(Array.from(e.dataTransfer.files)) });
 })();
 $("eleWarn").onclick = async () => { const n = await backfillAll(); toast(n ? `Still no elevation for ${n} points (service unavailable?)` : "Elevation filled ✓") };
-$("gTog").onclick = () => setGrade(!gOn);
+$("gTog").onclick = () => setGrade(!gOn); $("kmTog").onclick = () => setKm(!kmOn);
+if (!kmOn) { $("kmTog").classList.remove("on"); $("kmTog").setAttribute("aria-pressed", "false") }
 $("tEle").onclick = () => setTab("ele"); $("tCue").onclick = () => setTab("cues");
 $("pTog").onclick = () => setPanel(!document.body.classList.contains("pcol"));
 $("loc").onclick = () => map.locate({ enableHighAccuracy: true });
