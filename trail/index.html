@@ -79,6 +79,9 @@
  <div class="ctl-group">
   <button id="b3d" class="ctl t3d" aria-pressed="false" aria-label="3D terrain view" data-tip="3D terrain  3">3D</button>
  </div>
+ <div id="cmpGroup" class="ctl-group cmp-group">
+  <button id="cmp2d" class="ctl cmp" aria-pressed="false" aria-label="Compass: tap to rotate the map, drag to turn it, tap again for north" data-tip="Rotate map  N = north"><svg class="cmp-svg" viewBox="0 0 40 40" aria-hidden="true"><g class="cmp-rose"><circle cx="20" cy="20" r="15.5" class="cmp-ring"/><path class="cmp-ticks" d="M20 6.2v2.6M33.8 20h-2.6M20 33.8v-2.6M6.2 20h2.6"/><path class="cmp-s" d="M20 20 23.6 21.2 20 31.5 16.4 21.2z"/><path class="cmp-n" d="M20 8.5 23.6 18.8 20 20 16.4 18.8z"/><circle cx="20" cy="20" r="1.6" class="cmp-hub"/></g></svg><span class="cmp-deg" aria-hidden="true"></span></button>
+ </div>
  <div id="ctl3d" class="ctl-group ctl3d" role="group" aria-label="3D camera">
   <button id="c3L" class="ctl" aria-label="Rotate left" data-tip="Rotate left  [  (hold to spin)"><svg class="ic"><use href="#i-rotl"/></svg></button>
   <button id="c3R" class="ctl" aria-label="Rotate right" data-tip="Rotate right  ]  (hold to spin)"><svg class="ic"><use href="#i-rotr"/></svg></button>
@@ -146,7 +149,7 @@
    <button id="imp" class="btn" aria-label="Import GPX" data-tip="Import GPX  I"><svg class="ic"><use href="#i-import"/></svg><span>Import</span></button>
    <button id="wList" class="btn" aria-label="Waypoints" aria-expanded="false" data-tip="Waypoint list"><svg class="ic"><use href="#i-list"/></svg><span class="wl-t">Waypoints</span><span class="badge" id="wCount">0</span></button>
    <button id="exp" class="btn primary" aria-label="Export GPX" data-tip="Export GPX  E"><svg class="ic"><use href="#i-export"/></svg><span>Export<span class="dk"> GPX</span></span></button>
-   <input type="file" id="impFile" accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden>
+   <input type="file" id="impFile" multiple accept=".gpx,application/gpx+xml,application/xml,text/xml" hidden>
   </div>
 
   <div class="status-row">
@@ -196,6 +199,17 @@
   <div class="sd-btns"><button type="button" id="saveCancel" class="btn">Cancel</button><button type="submit" id="saveCopy" class="btn">Save as copy</button><button type="submit" id="saveOk" class="btn primary">Save</button></div>
  </form>
 </dialog>
+<dialog id="batchDlg" class="savedlg" aria-labelledby="batchTitle">
+ <form id="batchForm" method="dialog">
+  <h2 id="batchTitle">Import GPX files</h2>
+  <p class="sd-sub" id="batchSub"></p>
+  <ul id="batchList" class="blist"></ul>
+  <label class="sd-f"><span>Folder</span><select id="batchFolder" aria-label="Folder for imported routes"></select></label>
+  <label class="sd-f" id="batchDupRow"><span>Same name</span><select id="batchDup" aria-label="When a saved route has the same name"><option value="update">Update the saved route</option><option value="copy">Keep both (add a copy)</option><option value="skip">Skip the file</option></select></label>
+  <div class="sd-btns"><button type="button" id="batchCancel" class="btn">Cancel</button><button type="submit" id="batchOk" class="btn primary">Import</button></div>
+ </form>
+</dialog>
+<div id="dropZone" class="dropzone" hidden><div>Drop GPX files to import</div></div>
 <dialog id="moveDlg" class="savedlg" aria-labelledby="moveTitle">
  <form method="dialog"><h2 id="moveTitle">Move to folder</h2><ul id="moveList" class="mlist"></ul><div class="sd-btns"><button class="btn">Cancel</button></div></form>
 </dialog>
@@ -226,15 +240,16 @@
    <dt><kbd>⌘</kbd><kbd>S</kbd> / <kbd>Ctrl</kbd><kbd>S</kbd></dt><dd>Save route</dd>
    <dt><kbd>R</kbd></dt><dd>Add return path</dd>
    <dt><kbd>E</kbd></dt><dd>Export GPX</dd>
-   <dt><kbd>I</kbd></dt><dd>Import GPX</dd>
+   <dt><kbd>I</kbd></dt><dd>Import GPX (pick several, or drop files on the map)</dd>
    <dt><kbd>G</kbd></dt><dd>Colour route by grade on/off</dd>
    <dt><kbd>C</kbd></dt><dd>Switch Elevation / Cue sheet</dd>
    <dt><kbd>P</kbd></dt><dd>Show/hide elevation profile</dd>
    <dt><kbd>←</kbd> <kbd>→</kbd></dt><dd>Move along the route (hold <kbd>Shift</kbd> for 500 m)</dd>
    <dt><kbd>3</kbd></dt><dd>3D terrain view on/off</dd>
-   <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>3D: rotate left / right</dd>
+   <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Rotate map left / right</dd>
+   <dt><kbd>Shift</kbd>/<kbd>Ctrl</kbd> + drag</dt><dd>2D: rotate map (or right-drag, or Shift + scroll; two-finger twist on touch)</dd>
    <dt><kbd>↑</kbd> <kbd>↓</kbd></dt><dd>3D: tilt up / down</dd>
-   <dt><kbd>N</kbd></dt><dd>3D: reset north and tilt</dd>
+   <dt><kbd>N</kbd></dt><dd>Reset to north (3D: north and tilt)</dd>
    <dt><kbd>K</kbd></dt><dd>3D: orbit around the route</dd>
    <dt><kbd>L</kbd></dt><dd>Go to my location</dd>
    <dt><kbd>+</kbd> <kbd>−</kbd></dt><dd>Zoom</dd>
@@ -245,6 +260,7 @@
 </dialog>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script src="vendor/leaflet-rotate.js"></script>
 <script src="config.js"></script>
 <script src="app.js"></script>
 <script src="sync.js"></script>

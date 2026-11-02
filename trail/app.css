@@ -460,3 +460,36 @@ body.v3d #map3d .maplibregl-ctrl-bottom-right{display:none}
 #acctOut,#acctIn{display:flex;flex-direction:column;gap:10px}
 .gbtn{min-height:40px}
 @media (max-width:899px){.lib-bk .btn,.acct-row .btn{min-height:44px}}
+
+/* 2D compass (rotate the Leaflet map). Solid like the other controls; red N tip; hidden in 3D. */
+.cmp-group{border-radius:50%}
+.ctl.cmp{position:relative;touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
+.cmp-svg{width:30px;height:30px;overflow:visible}
+.cmp-rose{transform-origin:20px 20px}
+.cmp-ring{fill:none;stroke:var(--sep);stroke-width:1.4}
+.cmp-ticks{stroke:var(--text2);stroke-width:1.6;stroke-linecap:round}
+.cmp-n{fill:#ff3b30}
+.cmp-s{fill:var(--text2);opacity:.55}
+.cmp-hub{fill:var(--glass-solid);stroke:var(--text2);stroke-width:.8}
+.cmp-deg{position:absolute;left:50%;bottom:-1px;transform:translateX(-50%);font:600 8px/1 var(--font);color:var(--text2);letter-spacing:-.02em;pointer-events:none}
+.cmp.turned .cmp-svg{transform:translateY(-2px)}
+.cmp.turned .cmp-ring{stroke:var(--accent)}
+.cmp[aria-pressed="true"]{background:var(--accent-soft)}
+.cmp[aria-pressed="true"] .cmp-ring{stroke:var(--accent);stroke-width:2}
+body.rotmode #map{cursor:grab}
+body.rotmode #map:active{cursor:grabbing}
+body.v3d .cmp-group{display:none}
+@media (min-width:900px){.ctl.cmp{width:44px;height:44px}.cmp-svg{width:34px;height:34px}.cmp-deg{font-size:9px}}
+@media (max-width:899px){.cmp-svg{width:32px;height:32px}}
+
+/* Multi-file GPX import */
+.blist{list-style:none;margin:0;padding:0;max-height:min(40vh,260px);overflow:auto;border:1px solid var(--sep);border-radius:10px}
+.blist li{display:flex;flex-direction:column;gap:1px;padding:8px 10px;font-size:13px}
+.blist li+li{border-top:1px solid var(--sep)}
+.blist li span{color:var(--text2);font-size:12px}
+.blist li.bad b{color:var(--text2);text-decoration:line-through}
+.blist li.bad span{color:#d70015}
+.blist li.dup span{color:var(--accent)}
+.dropzone{position:fixed;inset:12px;z-index:3000;border:3px dashed var(--accent);border-radius:18px;background:rgba(0,113,227,.08);display:grid;place-items:center;pointer-events:none}
+.dropzone[hidden]{display:none}
+.dropzone div{background:var(--glass-solid);color:var(--accent);font-weight:650;padding:12px 18px;border-radius:12px;box-shadow:var(--shadow-s)}

@@ -421,7 +421,7 @@ function buildCues(P = SC.pts, cum = SC.cum) {
 async function rebuildCues() { await updJoins() }   // old saved cues (cv < CUE_VER) are recomputed from OSM
 
 /* 5. Route editing & drawing --------------------------------------------------- */
-const map = L.map("map", { zoomControl: false, zoomSnap: .5, wheelPxPerZoomLevel: 90 }).setView(HOME, HOME_ZOOM);
+const map = L.map("map", { zoomControl: false, zoomSnap: .5, wheelPxPerZoomLevel: 90, rotate: true, bearing: 0, touchRotate: true, shiftKeyRotate: true, rotateControl: false }).setView(HOME, HOME_ZOOM);
 L.control.scale({ imperial: false, position: "bottomright" }).addTo(map);
 map.on("locationfound", e => map.setView(e.latlng, 15));
 map.on("locationerror", () => toast("Location unavailable (needs HTTPS and permission)"));
@@ -485,7 +485,7 @@ map.on("click", e => {
 // Freehand drawing with pointer events (mouse, pen and touch).
 let drawing = null, drawLine = null; const mc = map.getContainer();
 mc.addEventListener("pointerdown", e => {
-  if (mode !== "free" || e.target.closest(".leaflet-control")) return;
+  if (mode !== "free" || rotMode || e.target.closest(".leaflet-control")) return;
   e.preventDefault(); e.stopPropagation(); mc.setPointerCapture(e.pointerId);
   const ll = map.mouseEventToLatLng(e); drawing = [];
   if (anchors.length) { const pv = segs.length && segs.at(-1).pts.length ? segs.at(-1).pts.at(-1) : [anchors.at(-1).lat, anchors.at(-1).lng]; drawing.push([pv[0], pv[1], null]) }
@@ -897,7 +897,7 @@ function setMode(m) {
   for (const [id, k] of [["mSnap", "snap"], ["mFree", "free"], ["mWpt", "wpt"]]) { $(id).classList.toggle("on", m === k); $(id).setAttribute("aria-pressed", m === k) }
   document.body.classList.toggle("drawing", m === "free"); document.body.classList.toggle("wptmode", m === "wpt");
   markers.forEach(k => k.dragging && (m === "free" ? k.dragging.disable() : k.dragging.enable()));
-  if (m === "free") map.dragging.disable(); else map.dragging.enable();
+  if (rotMode) setRotMode(false); if (m === "free") map.dragging.disable(); else map.dragging.enable();
   $("modeHint").textContent = MODE_HINT[m];
   if (!isDesktop()) { if (m === "free") toast("Freehand: drag to draw. Pinch to zoom."); if (m === "wpt") toast("Waypoint: tap the map to drop one") }
   updHint();
@@ -965,7 +965,7 @@ function updHint() {
 addEventListener("keydown", e => {
   if (/^(input|select|textarea)$/i.test(e.target.tagName || "") && !((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s")) return;
   if ($("saveDlg").open) { if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") e.preventDefault(); return }
-  if ($("help").open) return;
+  if ($("help").open || $("batchDlg").open) return;
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); if (!$("saveDlg").open) saveDialog(); return }
   if (mod && e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undo(); return }
@@ -976,10 +976,10 @@ addEventListener("keydown", e => {
   const act = {
     s: () => setMode("snap"), f: () => setMode("free"), w: () => setMode("wpt"), e: exportGpx, i: () => $("impFile").click(),
     g: () => setGrade(!gOn), c: () => setTab(tab === "cues" ? "ele" : "cues"), p: () => setPanel(!document.body.classList.contains("pcol")), l: () => map.locate({ enableHighAccuracy: true }),
-    "3": () => set3d(!on3d), "[": on3d ? () => rot3d(-ROT_STEP) : null, "]": on3d ? () => rot3d(ROT_STEP) : null,
-    ArrowUp: on3d ? () => tilt3d(TILT_STEP) : null, ArrowDown: on3d ? () => tilt3d(-TILT_STEP) : null, n: on3d ? reset3d : null, k: on3d ? toggleOrbit : null, "+": () => on3d ? m3.zoomIn() : map.zoomIn(), "=": () => on3d ? m3.zoomIn() : map.zoomIn(), "-": () => on3d ? m3.zoomOut() : map.zoomOut(), "?": () => $("help").showModal(),
+    "3": () => set3d(!on3d), "[": () => on3d ? rot3d(-ROT_STEP) : rot2d(-ROT2_STEP), "]": () => on3d ? rot3d(ROT_STEP) : rot2d(ROT2_STEP),
+    ArrowUp: on3d ? () => tilt3d(TILT_STEP) : null, ArrowDown: on3d ? () => tilt3d(-TILT_STEP) : null, n: () => on3d ? reset3d() : north2d(), k: on3d ? toggleOrbit : null, "+": () => on3d ? m3.zoomIn() : map.zoomIn(), "=": () => on3d ? m3.zoomIn() : map.zoomIn(), "-": () => on3d ? m3.zoomOut() : map.zoomOut(), "?": () => $("help").showModal(),
     ArrowRight: SC.pts.length > 1 ? () => stepScrub(1, e.shiftKey) : null, ArrowLeft: SC.pts.length > 1 ? () => stepScrub(-1, e.shiftKey) : null,
-    Escape: () => { toggleLayers(false); if (document.body.classList.contains("libopen")) return openLib(false); if (SC.pos != null) setScrub(null); else if ($("wpts").classList.contains("open")) openWpts(false) },
+    Escape: () => { toggleLayers(false); if (rotMode) return setRotMode(false); if (document.body.classList.contains("libopen")) return openLib(false); if (SC.pos != null) setScrub(null); else if ($("wpts").classList.contains("open")) openWpts(false) },
   }[k];
   if (!act) return;
   e.preventDefault(); act();
@@ -1021,10 +1021,10 @@ function upd3d() {
 function fit3d() {
   const P = SC.pts.length > 1 ? SC.pts : null, pitch = isDesktop() ? 60 : 50;
   const c = map.getCenter();
-  if (!P) return m3.jumpTo({ center: [c.lng, c.lat], zoom: Math.max(1, map.getZoom() - 1), pitch, bearing: 0 });
+  if (!P) return m3.jumpTo({ center: [c.lng, c.lat], zoom: Math.max(1, map.getZoom() - 1), pitch, bearing: bear2d() });
   let a = 90, b = -90, x = 180, y = -180; for (const p of P) { a = Math.min(a, p[0]); b = Math.max(b, p[0]); x = Math.min(x, p[1]); y = Math.max(y, p[1]) }
   const ui = $("ui").getBoundingClientRect(), dk = isDesktop();
-  m3.fitBounds([[x, a], [y, b]], { pitch, bearing: m3.getBearing(), duration: 0, maxZoom: 16, padding: dk ? { top: 60, bottom: 260, left: 380, right: 70 } : { top: 60, bottom: Math.min(ui.height, innerHeight * .5) + 20, left: 30, right: 60 } });
+  m3.fitBounds([[x, a], [y, b]], { pitch, bearing: bear2d(), duration: 0, maxZoom: 16, padding: dk ? { top: 60, bottom: 260, left: 380, right: 70 } : { top: 60, bottom: Math.min(ui.height, innerHeight * .5) + 20, left: 30, right: 60 } });
 }
 async function set3d(on) {
   if (on === on3d) return;
@@ -1033,12 +1033,12 @@ async function set3d(on) {
     $("b3d").classList.add("busy3d");
     try { await loadML() } catch (e) { $("b3d").classList.remove("busy3d"); return toast("Couldn't load the 3D map – check your connection") }
     $("b3d").classList.remove("busy3d");
-    set3d.v = { c: map.getCenter(), z: map.getZoom() };
+    setRotMode(false); set3d.v = { c: map.getCenter(), z: map.getZoom() };
     const el = $("map3d"); el.hidden = false; on3d = true; document.body.classList.add("v3d"); $("b3d").setAttribute("aria-pressed", "true");
     if (!m3) {
       const bt = baseTiles(store.get(KEY.layer, "topo"));
       m3 = new maplibregl.Map({
-        container: el, attributionControl: { compact: true }, maxPitch: isDesktop() ? 80 : 60, pitch: 60, center: [map.getCenter().lng, map.getCenter().lat], zoom: map.getZoom() - 1,
+        container: el, attributionControl: { compact: true }, maxPitch: isDesktop() ? 80 : 60, pitch: 60, bearing: bear2d(), center: [map.getCenter().lng, map.getCenter().lat], zoom: map.getZoom() - 1,
         style: { version: 8, sources: {
           base: { type: "raster", tiles: bt.tiles, tileSize: 256, maxzoom: bt.maxzoom, attribution: bt.attribution },
           dem: { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], tileSize: 256, maxzoom: 15, encoding: "terrarium", attribution: "Terrain: Mapzen / AWS Terrain Tiles" },
@@ -1056,7 +1056,7 @@ async function set3d(on) {
     } else { m3.resize(); upd3d(); fit3d() }
   } else {
     stopOrbit(); on3d = false; $("map3d").hidden = true; document.body.classList.remove("v3d"); $("b3d").setAttribute("aria-pressed", "false");
-    map.invalidateSize({ pan: false }); if (set3d.v) map.setView(set3d.v.c, set3d.v.z, { animate: false });   // 2D view exactly as left
+    map.invalidateSize({ pan: false }); if (set3d.v) map.setView(set3d.v.c, set3d.v.z, { animate: false }); if (m3) setBear2d(-m3.getBearing());   // 2D view as left, turned to the 3D heading   // 2D view exactly as left
   }
 }
 $("b3d").onclick = () => set3d(!on3d);
@@ -1089,12 +1089,130 @@ function holdRot(btn, dir) {
 holdRot($("c3L"), -1); holdRot($("c3R"), 1);
 $("c3Up").onclick = () => tilt3d(TILT_STEP); $("c3Dn").onclick = () => tilt3d(-TILT_STEP); $("c3Reset").onclick = reset3d; $("c3Orbit").onclick = toggleOrbit;
 L.DomEvent.disableClickPropagation($("ctl3d"));
+/* 11c. 2D map rotation (leaflet-rotate, vendored) ------------------------------------
+ * leaflet-rotate's bearing turns the map pane clockwise, so heading-up (MapLibre style) = -map.getBearing().
+ * Compass: tap at north = rotate mode (drag the map to turn it), tap when turned = back to north,
+ * press-and-drag on the compass = turn directly. Shift/Ctrl/right-drag on desktop; two-finger twist on touch. */
+const ROT2_STEP = 15, norm = d => ((d % 360) + 540) % 360 - 180;
+const bear2d = () => norm(-(map.getBearing() || 0));   // heading (deg clockwise from north) shown at the top of the screen
+function setBear2d(b) { map.setBearing(norm(b)) }
+var rotAnim = 0, rotMode = false;   // var: setMode() can run before this section
+function ease2d(to, ms = 380) {
+  cancelAnimationFrame(rotAnim); const from = map.getBearing(), d = norm(to - from), t0 = performance.now();
+  const step = t => { const k = Math.min(1, (t - t0) / ms), e = 1 - Math.pow(1 - k, 3); map.setBearing(from + d * e); if (k < 1) rotAnim = requestAnimationFrame(step) };
+  rotAnim = requestAnimationFrame(step);
+}
+function rot2d(d) { ease2d(map.getBearing() - d, 260) }   // d>0 turns the view clockwise, like 3D
+function north2d() { setRotMode(false); ease2d(0) }
+function updCompass() {
+  const h = bear2d(), b = $("cmp2d"); b.querySelector(".cmp-rose").style.transform = `rotate(${-h}deg)`;
+  b.classList.toggle("turned", Math.abs(h) >= .5); b.querySelector(".cmp-deg").textContent = Math.abs(h) >= .5 ? Math.round((h + 360) % 360) + "°" : "";
+}
+let tileT = 0;   // setBearing() alone doesn't refresh tiles on phones (updateWhenIdle), so top up the newly exposed corners
+map.on("rotate", () => { updCompass(); clearTimeout(tileT); tileT = setTimeout(() => map.eachLayer(l => l instanceof L.GridLayer && l._map && l._update()), 120) });
+function setRotMode(on) {
+  if (on === rotMode) return; rotMode = on; $("cmp2d").setAttribute("aria-pressed", on ? "true" : "false"); document.body.classList.toggle("rotmode", on);
+  if (on) { map.dragging.disable(); toast(isDesktop() ? "Drag the map to rotate · click the compass when done" : "Drag the map to rotate · tap the compass when done", 3000) }
+  else if (mode !== "free") map.dragging.enable();
+}
+// Angle-drag around the map centre (rotate mode, Shift/Ctrl/right-drag); pointer capture keeps it smooth outside the map.
+(() => {
+  let g = null, blockClick = false;
+  const ang = e => { const r = mc.getBoundingClientRect(); return Math.atan2(e.clientY - (r.top + r.height / 2), e.clientX - (r.left + r.width / 2)) * 180 / Math.PI };
+  mc.addEventListener("pointerdown", e => {
+    if (on3d || e.target.closest(".leaflet-control, .leaflet-marker-icon, .leaflet-popup")) return;
+    const mouseMod = e.pointerType === "mouse" && (e.shiftKey || e.ctrlKey || e.button === 2);
+    if (!(rotMode && e.isPrimary) && !(mouseMod && mode !== "free")) return;
+    e.preventDefault(); e.stopPropagation(); cancelAnimationFrame(rotAnim); mc.setPointerCapture(e.pointerId);
+    g = { id: e.pointerId, a: ang(e), b: map.getBearing(), x: e.clientX, y: e.clientY, moved: false };
+  }, true);
+  mc.addEventListener("pointermove", e => {
+    if (!g || e.pointerId !== g.id) return; e.stopPropagation();
+    if (Math.hypot(e.clientX - g.x, e.clientY - g.y) > 4) g.moved = true;
+    map.setBearing(g.b + norm(ang(e) - g.a));
+  }, true);
+  const end = e => { if (!g || e.pointerId !== g.id) return; blockClick = g.moved || rotMode; g = null; setTimeout(() => blockClick = false, 350) };
+  mc.addEventListener("pointerup", end, true); mc.addEventListener("pointercancel", end, true);
+  for (const t of ["mousedown", "touchstart"]) mc.addEventListener(t, e => { if (rotMode && !e.target.closest(".leaflet-control")) e.stopPropagation(); if (t === "mousedown" && (e.shiftKey || e.ctrlKey || e.button === 2) && !e.target.closest(".leaflet-control, .leaflet-marker-icon")) e.stopPropagation() }, true);
+  mc.addEventListener("click", e => { if (blockClick || rotMode) { e.stopPropagation(); e.preventDefault(); blockClick = false } }, true);
+  mc.addEventListener("contextmenu", e => e.preventDefault());
+})();
+// Compass button: tap = rotate mode / back to north; press-and-drag sideways = turn the map (0.6°/px).
+(() => {
+  const b = $("cmp2d"); let p = null;
+  b.addEventListener("pointerdown", e => { if (e.button) return; b.setPointerCapture(e.pointerId); cancelAnimationFrame(rotAnim); p = { x: e.clientX, y: e.clientY, b: map.getBearing(), drag: false } });
+  b.addEventListener("pointermove", e => {
+    if (!p) return; const dx = e.clientX - p.x, dy = e.clientY - p.y;
+    if (!p.drag && Math.hypot(dx, dy) > 6) p.drag = true;
+    if (p.drag) map.setBearing(p.b - (dx - dy * .5) * .6);
+  });
+  const end = () => { if (p && p.drag) b.dataset.dragged = "1"; p = null };
+  b.addEventListener("pointerup", end); b.addEventListener("pointercancel", end); b.addEventListener("lostpointercapture", end);
+  b.addEventListener("click", () => {
+    if (b.dataset.dragged) return delete b.dataset.dragged;
+    if (rotMode) return setRotMode(false);
+    if (Math.abs(bear2d()) >= .5) return north2d();
+    setRotMode(true);
+  });
+  L.DomEvent.disableClickPropagation($("cmpGroup"));
+})();
+updCompass();
 // wiring
 $("mSnap").onclick = () => setMode("snap"); $("mFree").onclick = () => setMode("free"); $("mWpt").onclick = () => setMode("wpt");
 $("undo").onclick = undo; $("ret").onclick = returnPath; $("clear").onclick = clearRoute; $("exp").onclick = exportGpx;
 $("wList").onclick = () => openWpts(!$("wpts").classList.contains("open"));
 $("imp").onclick = () => $("impFile").click();
-$("impFile").onchange = async e => { const f = e.target.files[0]; e.target.value = ""; if (!f) return; try { await importGpx(await f.text()) } catch (err) { toast("Could not read GPX: " + err.message, 5000) } };
+$("impFile").onchange = e => { const fs = Array.from(e.target.files || []); e.target.value = ""; importFiles(fs) };
+/* Multi-file import: one file opens on the map as before; several become saved routes in one go. */
+async function importFiles(files) {
+  files = files.filter(f => f && f.size !== undefined); if (!files.length) return;
+  if (files.length === 1) { try { await importGpx(await files[0].text()) } catch (err) { toast("Could not read GPX: " + err.message, 5000) } return }
+  const items = await Promise.all(files.map(async f => {
+    const base = f.name.replace(/\.gpx$/i, "").replace(/[_]+/g, " ").trim() || "Imported route";
+    if (!/\.gpx$/i.test(f.name) && !/xml|gpx/.test(f.type || "")) return { file: f.name, err: "not a .gpx file" };
+    try { const g = parseGpx(await f.text()); if (g.pts.length < 2 && !g.wpts.length) return { file: f.name, err: "no track, route or waypoints" }; return { file: f.name, g, name: (g.name || base).slice(0, 80) } }
+    catch (e) { return { file: f.name, err: e.message === "Not valid XML" ? "not valid GPX" : e.message } }
+  }));
+  items.forEach(it => { if (!it.err) it.dup = lib.find(r => r.name.trim().toLowerCase() === it.name.trim().toLowerCase()) });
+  const ok = items.filter(it => !it.err), dups = ok.filter(it => it.dup).length;
+  $("batchSub").textContent = `${ok.length} of ${items.length} file${items.length > 1 ? "s" : ""} ready${dups ? ` · ${dups} already saved` : ""}`;
+  $("batchList").innerHTML = items.map(it => `<li class="${it.err ? "bad" : it.dup ? "dup" : ""}"><b>${esc(it.err ? it.file : it.name)}</b><span>${it.err ? "Skipped: " + esc(it.err) : `${it.g.pts.length} pts${it.g.wpts.length ? ` · ${it.g.wpts.length} wpts` : ""}${it.dup ? " · same name saved" : ""}`}</span></li>`).join("");
+  fillFolderSel($("batchFolder"), curFolder); $("batchDupRow").hidden = !dups; $("batchOk").disabled = !ok.length;
+  const d = $("batchDlg"); d.showModal();
+  const go = await new Promise(res => { $("batchOk").onclick = e => { e.preventDefault(); res(true) }; $("batchCancel").onclick = () => res(false); d.onclose = () => res(false) });
+  d.onclose = null; if (d.open) d.close(); if (!go) return;
+  const fs = $("batchFolder").value, folder = fs === "__new" ? newFolder() : fs || null, how = $("batchDup").value;
+  libSave(); let added = 0, updated = 0, same = 0, skipped = items.length - ok.length, lastId = null;
+  for (const it of ok) {
+    const g = it.g, pts = g.pts.filter((p, i) => !i || hav(g.pts[i - 1], p) > .5);
+    const data = pts.length >= 2 ? { anchors: [{ lat: pts[0][0], lng: pts[0][1] }, { lat: pts.at(-1)[0], lng: pts.at(-1)[1] }], segs: [{ mode: "free", imported: true, pts, cues: [] }], wpts: g.wpts }
+      : { anchors: [], segs: [], wpts: g.wpts };
+    let m = it.dup && how !== "copy" ? it.dup : null;
+    if (m && how === "skip") { skipped++; continue }
+    if (m) {   // same name: if the track is identical (same point count) leave it alone, else replace its contents in place
+      let old = null; try { old = JSON.parse(localStorage.getItem(RKEY(m.id)) || "null") } catch (e) { }
+      const oldN = old ? old.segs.reduce((a, s) => a + s.pts.length, 0) : -1;
+      if (oldN === pts.length && (old.wpts || []).length === g.wpts.length) { same++; if (fs) m.folder = folder; lastId = m.id; continue }
+    }
+    const now = Date.now(), dist = pts.reduce((a, p, i) => i ? a + hav(pts[i - 1], p) : 0, 0);
+    if (!m) { m = { id: newId(), name: it.name, src: "imported", created: now, folder }; lib.unshift(m); added++ } else { updated++; if (fs) m.folder = folder }
+    Object.assign(m, { updated: now, dist, asc: Math.round(climbSeries(pts).total), n: data.anchors.length, w: g.wpts.length, thumb: routeThumb(pts) });
+    try { localStorage.setItem(RKEY(m.id), JSON.stringify(data)) } catch (e) { toast("Storage full – delete some saved routes"); break }
+    lastId = m.id;
+    if (m.id === curId) { resetRoute(); load(data); render(); renderW(); updHint(); store.set(KEY.route, JSON.stringify(data)) }
+  }
+  libPut(); renderLib(); openLib(true);   // libPut() tells TPSync, so the batch syncs like a normal save
+  const parts = []; if (added) parts.push(`Imported ${added} route${added > 1 ? "s" : ""}`); if (updated) parts.push(`updated ${updated} route${updated > 1 ? "s" : ""}`); if (same) parts.push(`${same} unchanged`);
+  toast((parts.join(", ") || "Nothing imported").replace(/^./, c => c.toUpperCase()) + (skipped ? ` (${skipped} skipped)` : ""), 5000);
+}
+// Drag and drop GPX files onto the window (desktop)
+(() => {
+  let n = 0; const z = $("dropZone"), has = e => Array.from(e.dataTransfer?.types || []).includes("Files");
+  addEventListener("dragenter", e => { if (!has(e)) return; n++; z.hidden = false });
+  addEventListener("dragleave", e => { if (!has(e)) return; if (--n <= 0) { n = 0; z.hidden = true } });
+  addEventListener("dragover", e => { if (has(e)) e.preventDefault() });
+  addEventListener("drop", e => { if (!has(e)) return; e.preventDefault(); n = 0; z.hidden = true; importFiles(Array.from(e.dataTransfer.files)) });
+})();
 $("eleWarn").onclick = async () => { const n = await backfillAll(); toast(n ? `Still no elevation for ${n} points (service unavailable?)` : "Elevation filled ✓") };
 $("gTog").onclick = () => setGrade(!gOn);
 $("tEle").onclick = () => setTab("ele"); $("tCue").onclick = () => setTab("cues");
