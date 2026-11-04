@@ -745,9 +745,30 @@ function scrubDecor(x) {
 (() => {   // chart pointer / touch / keyboard scrubbing
   const c = $("profile"); let id = null;
   const at = e => { const g = SC.geo; if (!g || SC.pts.length < 2) return; const r = c.getBoundingClientRect(); setScrub((e.clientX - r.left - g.L0) / (g.W - g.L0 - g.R0) * g.D) };
-  c.addEventListener("pointerdown", e => { if (SC.pts.length < 2) return; e.preventDefault(); id = e.pointerId; try { c.setPointerCapture(id) } catch (_) { } at(e) });
-  c.addEventListener("pointermove", e => { if (id === e.pointerId) { e.preventDefault(); at(e) } else if (canHover && e.pointerType === "mouse" && id == null && SC.pts.length > 1) at(e) });
-  const up = e => { if (id === e.pointerId) id = null }; c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
+  // Plain click/tap (no drag) also offers "Add waypoint here" at that distance; dragging only scrubs as before.
+  const pb = $("pAddW"); let down = null, addD = null;
+  const hideAdd = () => { pb.hidden = true; addD = null };
+  c.addEventListener("pointerdown", e => { if (SC.pts.length < 2) return; e.preventDefault(); hideAdd(); id = e.pointerId; down = { x: e.clientX, y: e.clientY, t: performance.now(), moved: false }; try { c.setPointerCapture(id) } catch (_) { } at(e) });
+  c.addEventListener("pointermove", e => { if (id === e.pointerId) { e.preventDefault(); if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) down.moved = true; at(e) } else if (canHover && e.pointerType === "mouse" && id == null && SC.pts.length > 1) at(e) });
+  const up = e => {
+    if (id !== e.pointerId) return; id = null;
+    if (e.type === "pointerup" && down && !down.moved && performance.now() - down.t < 600 && SC.pos != null && SC.geo) {
+      const g = SC.geo, r = c.getBoundingClientRect(), wr = $("pwrap").getBoundingClientRect(); addD = SC.pos;
+      pb.hidden = false; const X = r.left - wr.left + g.X(addD), bw = pb.offsetWidth;
+      pb.style.left = Math.max(4, Math.min(X - bw / 2, wr.width - bw - 4)) + "px"; pb.style.top = (r.top - wr.top + g.BY - pb.offsetHeight - 10) + "px";
+    }
+    down = null;
+  };
+  c.addEventListener("pointerup", up); c.addEventListener("pointercancel", up);
+  pb.addEventListener("pointerdown", e => e.stopPropagation());
+  pb.onclick = async () => {
+    const s = scrubState(addD); hideAdd(); if (!s) return;
+    const w = await addWpt({ lat: s.ll[0], lng: s.ll[1] }, "drink", undefined, s.ele);   // same flow as a map waypoint (opens the Waypoints list to name/type it)
+    toast(`Waypoint added at ${(s.d / 1000).toFixed(2)} km – set its type and name in Waypoints`);
+  };
+  addEventListener("pointerdown", e => { if (!pb.hidden && e.target !== c && !pb.contains(e.target)) hideAdd() }, true);
+  addEventListener("keydown", e => { if (e.key === "Escape") hideAdd() });
+  c.addEventListener("pointerleave", e => { if (e.pointerType === "mouse" && id == null && !pb.hidden) { /* keep popover; scrub stays at the clicked spot */ } });
   // iOS Safari: stop page scroll / rubber-band while a finger is on the chart
   c.addEventListener("touchstart", e => { if (SC.pts.length >= 2) e.preventDefault() }, { passive: false });
   c.addEventListener("touchmove", e => e.preventDefault(), { passive: false });
@@ -815,10 +836,10 @@ function wMarker(w) {
   m.on("dragend", async () => { const ll = m.getLatLng(); w.lat = ll.lat; w.lng = ll.lng; const p = [w.lat, w.lng, null]; await fillEle([p]); w.ele = p[2]; updEleWarn(); save(); renderW() });
   return m;
 }
-async function addWpt(ll, type = "drink", name) {
-  const w = { lat: ll.lat, lng: ll.lng, ele: null, type, name: name || WTYPES[type].label };
+async function addWpt(ll, type = "drink", name, ele = null) {
+  const w = { lat: ll.lat, lng: ll.lng, ele: ele ?? null, type, name: name || WTYPES[type].label };
   wpts.push(w); wmarkers.push(wMarker(w)); openWpts(true); save(); updHint();
-  const p = [w.lat, w.lng, null]; await fillEle([p]); w.ele = p[2]; updEleWarn(); save(); renderW(); return w;
+  if (w.ele == null) { const p = [w.lat, w.lng, null]; await fillEle([p]); w.ele = p[2] } updEleWarn(); save(); renderW(); return w;
 }
 function delWpt(i) { map.removeLayer(wmarkers[i]); wpts.splice(i, 1); wmarkers.splice(i, 1); renderW(); save() }
 function openWpts(open) { $("wpts").classList.toggle("open", open); $("wList").setAttribute("aria-expanded", open); renderW() }
