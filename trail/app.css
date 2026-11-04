@@ -499,3 +499,10 @@ body.v3d .cmp-group{display:none}
 .kmk{pointer-events:none!important;display:grid;place-items:center;width:20px;height:20px}
 .kmk span{min-width:18px;height:18px;padding:0 4px;box-sizing:border-box;border-radius:9px;background:#fff;color:#1d1d1f;border:1.5px solid rgba(29,29,31,.8);font:700 10px/15px var(--font);text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.35);letter-spacing:-.02em}
 .km-chip{display:inline-grid;place-items:center;width:15px;height:15px;border-radius:50%;border:1.5px solid currentColor;font-size:9px;font-weight:700;line-height:1}
+
+/* Elevation chart: "Add waypoint here" popover after a plain click/tap */
+#pwrap{position:relative}
+.paddw{position:absolute;z-index:5;display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border:0;border-radius:16px;background:var(--accent);color:var(--accent-ink,#fff);font:600 13px var(--font);box-shadow:var(--shadow-s);white-space:nowrap;cursor:pointer}
+.paddw .ic{width:15px;height:15px}
+.paddw[hidden]{display:none}
+@media (max-width:899px){.paddw{height:36px;font-size:14px}}
