@@ -68,7 +68,7 @@
 <div id="map" role="application" aria-label="Map. Click to add route points."></div>
 
 <div id="map3d" hidden aria-label="3D terrain view (view only). Drag to pan, right-drag or two fingers to rotate and tilt."></div>
-<div id="wmark" class="wmark" aria-hidden="true">Trail Planner <span>by GrokBot</span> <span class="ver">v17</span></div>
+<div id="wmark" class="wmark" aria-hidden="true">Trail Planner <span>by GrokBot</span> <span class="ver">v18</span></div>
 <div id="hint" class="hint" role="status" aria-live="polite" hidden>
  <svg class="ic"><use href="#i-snap"/></svg><span id="hintText">Click the map to start your route</span>
 </div>
@@ -118,7 +118,7 @@
  <aside id="side" class="glass" aria-label="Route tools">
   <header class="brand">
    <img src="icons/favicon.svg" alt="" width="28" height="28">
-   <div class="brand-t"><h1>Trail Planner <span class="ver" id="appVer">v17</span></h1><p>Plan · Profile · Export GPX</p></div>
+   <div class="brand-t"><h1>Trail Planner <span class="ver" id="appVer">v18</span></h1><p>Plan · Profile · Export GPX</p></div>
    <button id="saveBtn2" class="icon-btn savebtn" aria-label="Save route" data-tip="Save  ⌘S"><svg class="ic"><use href="#i-save"/></svg></button>
    <button id="libBtn2" class="icon-btn" aria-label="Saved routes" data-tip="Saved routes  O" onclick="openLib()"><svg class="ic"><use href="#i-folder"/></svg></button>
    <button id="helpBtn" class="icon-btn" aria-label="Keyboard shortcuts" data-tip="Shortcuts  ?"><svg class="ic"><use href="#i-keyboard"/></svg></button>
@@ -186,7 +186,7 @@
    </div>
   </div>
   <div id="legend" class="legend" aria-hidden="true"></div>
-  <div id="pwrap"><div id="pEmpty" hidden><svg class="ic"><use href="#i-grade"/></svg><b>No elevation profile yet</b><span>Add two or more points and the profile appears here.</span></div><canvas id="profile" role="img" aria-label="Elevation profile. Drag to move the marker along the route; arrow keys step along it." tabindex="0"></canvas></div>
+  <div id="pwrap"><div id="pEmpty" hidden><svg class="ic"><use href="#i-grade"/></svg><b>No elevation profile yet</b><span>Add two or more points and the profile appears here.</span></div><canvas id="profile" role="img" aria-label="Elevation profile. Drag to move the marker along the route, tap to add a waypoint there; arrow keys step along it." tabindex="0"></canvas><button id="pAddW" class="paddw" type="button" hidden><svg class="ic"><use href="#i-flag"/></svg><span>Add waypoint here</span></button></div>
   <div id="cues" class="cues" aria-label="Cue sheet"></div>
  </section>
 </div>
