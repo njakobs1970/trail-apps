@@ -1,3 +1,4 @@
+// v24: PNF phase banner
 importScripts('version.js');
 const C='stretch'+self.VERSION+'-v'+self.VERSION;
 const A=['./','index.html','style.css','app.js','version.js','generator.js','stretches.js','develop.js','evidence.js','library.js','testguide.js','evidence.json','manifest.webmanifest','icon.svg','icon-180.png','icon-192.png','icon-512.png','ten-seconds.mp3'];

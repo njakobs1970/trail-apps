@@ -157,9 +157,17 @@ function enterStep(i){
   const nxt=routine.steps.slice(i+1).find(s=>s.type==='hold'&&(s.ex!==st.ex||s.side!==st.side));
   $('#pNext').textContent=nxt?`Next up: ${nxt.ex.name}${nxt.side?' ('+nxt.side+')':''}`:'Last one';
   $('#backBtnP').disabled=i===0;
+  pnfBanner(i,st);
   beep(st.type==='hold'?880:st.type==='contract'?740:520,st.type==='hold'?0.3:0.15);
   if(st.kg>0&&st.type!=='rate')$('#pName').textContent=ex.icon+' '+ex.name+' · '+st.kg+' kg';
 }
+const PNF={contract:['CONTRACT','Push gently ~20–30% effort',[60,60,60]],relax:['RELAX','Let go, breathe out',[200]],sink:['RELAX & DEEPEN','Ease further into the stretch',[120,80,120]],final:['FINAL HOLD','Hold & breathe, tight not painful',[300]]};
+function pnfBanner(i,st){const P=$('#player'),on=!!(st.pnf&&PNF[st.pnf]);P.classList.toggle('pnfon',on);for(const k in PNF)P.classList.toggle('pnf-'+k,on&&st.pnf===k);
+  $('#pnfBanner').hidden=$('#pnfNext').hidden=$('#pnfDots').hidden=!on;if(!on)return;const d=PNF[st.pnf];
+  $('#pnfLab').textContent=d[0];$('#pnfHow').textContent=d[1];$('#pnfRep').textContent=(st.side?st.side.toUpperCase()+' · ':'')+(st.round?`ROUND ${st.round} OF ${st.rounds}`:'LAST STEP');
+  $('#pnfDots').innerHTML=Array.from({length:st.rounds||0},(_,j)=>`<i class="${!st.round||j+1<st.round?'done':j+1===st.round?'cur':''}"></i>`).join('');
+  const nx=routine.steps[i+1];$('#pnfNext').innerHTML=nx&&nx.pnf&&nx.ex===st.ex&&nx.side===st.side?`Next: <b>${PNF[nx.pnf][0]}</b> · ${nx.secs} s`:nx&&nx.type==='switch'?'Next: <b>Switch sides</b>':nx&&nx.type==='rate'?'Next: <b>Rate this block</b>':'Next: <b>'+(nx&&(nx.ex||nx.next)?(nx.ex||nx.next).name:'Finish')+'</b>';
+  try{navigator.vibrate&&navigator.vibrate(d[2])}catch{}}
 let lastCount=null;
 const tapRest=st=>settings.restMode==='tap'&&!!st&&isRest(st)&&st.type!=='rate';
 function activeSec(steps){return steps.reduce((a,s)=>a+(settings.restMode==='tap'&&isRest(s)?0:s.secs),0)}

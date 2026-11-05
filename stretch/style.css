@@ -179,3 +179,16 @@ details>summary::after{content:'›';margin-left:auto;color:var(--label3);font-s
 
 .ver{font-size:13px;font-weight:400;color:var(--label2,#8e8e93);background:none;border:0;padding:0 0 0 4px;letter-spacing:0;vertical-align:middle;opacity:.8}
 #player{padding-top:calc(22px + env(safe-area-inset-top))}
+
+/* v24 PNF phase banner: white text on fills all >=5.4:1; rings >=3:1 on bg */
+#player{--ph:var(--accent)}
+#player.pnf-contract{--ph:#B42318;--phr:#B42318}#player.pnf-relax{--ph:#1D4ED8;--phr:#1D4ED8}#player.pnf-sink{--ph:#047857;--phr:#047857}#player.pnf-final{--ph:#6D28D9;--phr:#6D28D9}
+@media (prefers-color-scheme:dark){#player.pnf-contract{--phr:#FF6B5E}#player.pnf-relax{--phr:#6EA8FF}#player.pnf-sink{--phr:#34D399}#player.pnf-final{--phr:#B794F6}}
+.pnfb{background:var(--ph);color:#fff;border-radius:22px;padding:14px 16px 12px;text-align:center;transition:background .3s}
+.pnfb .rep{display:inline-block;font-size:14px;font-weight:700;letter-spacing:.08em;background:rgba(0,0,0,.28);padding:3px 10px;border-radius:99px}
+.pnfb .lab{font-size:40px;font-weight:800;letter-spacing:.02em;margin:6px 0 2px;line-height:1.05}.pnfb .how{font-size:17px;font-weight:500}
+#player.pnfon #pPhase{display:none}#player.pnfon .ring .prog{stroke:var(--phr)}#player.pnfon .timer{font-size:84px;font-weight:300}
+#player.pnfon #pauseBtn{background:var(--ph);color:#fff}#player.pnfon #pNext{display:none}
+.pnfnext{text-align:center;color:var(--label);font-size:16px;margin:0}.pnfnext b{font-weight:700}
+.pnfdots{display:flex;justify-content:center;gap:6px}.pnfdots i{width:10px;height:10px;border-radius:50%;background:var(--fill)}.pnfdots i.done{background:var(--label2)}.pnfdots i.cur{background:var(--phr)}
+@media (prefers-reduced-motion:reduce){.pnfb{transition:none}}

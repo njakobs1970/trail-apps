@@ -105,7 +105,7 @@ function needKey(ctx,a){const A=AREAS[a];if(!A.key)return null;const need=R.rete
   const have=k=>(ctx.pats[k]?ctx.pats[k].size:0);const low=A.key.filter(k=>have(k)<need).sort((x,y)=>have(x)-have(y));return low[0]||null}
 function secPick(ctx,a){const A=AREAS[a];const L=Object.fromEntries(ctx.lib.map(s=>[s.id,s]));const ids=A.pnf.filter(id=>!ctx.used.has(id));const id=ids[Math.floor(ctx.rand()*ids.length)]||A.pnf[0];ctx.used.add(id);const s=L[id];const r=ctx.G.resolve(s,ctx.lib,ctx.avail)||s;return r!==s?{...r,swappedFrom:s.name}:r}
 function holdSteps(ex,list,extra={}){
-  const one=side=>list.map(x=>({type:x.type||'hold',secs:x.secs,ex,side,phase:x.phase,...extra}));
+  const one=side=>list.map(x=>({type:x.type||'hold',secs:x.secs,ex,side,phase:x.phase,...(x.pnf?{pnf:x.pnf,round:x.round,rounds:x.rounds}:{}),...extra}));
   return ex.sides?[...one('Left'),{type:'switch',secs:SW,next:ex,label:'Switch sides'},...one('Right')]:one(null);
 }
 function deficit(dev,a,now){const t=(dev.maint.includes(a)?R.weeklyFloorMinPerArea:R.weeklyTargetMinPerArea)*60;return Math.max(0,t-(weekSecs(dev,now)[a]||0))/t}
@@ -158,8 +158,8 @@ function build1(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0,maxSec=
     for(const a of today){const A=AREAS[a];const v=vol(dev,a,now);
       const ex=A.secondary?secPick(ctx,a):pick(ctx,a,'P',{pattern:needKey(ctx,a)});if(!ex)continue;const pat=ex.pattern||a;const p=pp(dev,pat);
       const rounds=Math.max(1,Math.round(p.rounds*Math.min(v,1.25))),fin=H(Math.min(p.final,cap)*(deload?R.deloadFactor:1));
-      const seq=[];for(let r=0;r<rounds;r++)seq.push({secs:R.pnf.contractSec,phase:`Contract ~30% (${r+1}/${rounds})`,type:'contract'},{secs:R.pnf.relaxSec,phase:'Relax, breathe out',type:'relax'},{secs:R.pnf.sinkSec,phase:`Sink deeper (${r+1}/${rounds})`});
-      seq.push({secs:fin,phase:'Final hold'});
+      const seq=[];for(let r=0;r<rounds;r++)seq.push({secs:R.pnf.contractSec,phase:`Contract ~30% (${r+1}/${rounds})`,type:'contract',pnf:'contract',round:r+1,rounds},{secs:R.pnf.relaxSec,phase:'Relax, breathe out',type:'relax',pnf:'relax',round:r+1,rounds},{secs:R.pnf.sinkSec,phase:`Sink deeper (${r+1}/${rounds})`,pnf:'sink',round:r+1,rounds});
+      seq.push({secs:fin,phase:'Final hold',pnf:'final',round:0,rounds});
       add('2 · PNF: '+A.name,'pnf',ex,holdSteps(ex,seq,{area:a}),`PNF ${rounds}×(${R.pnf.contractSec}s contract · ${R.pnf.relaxSec}s relax · ${R.pnf.sinkSec}s deeper) + ${fin}s final${ex.sides?' · each side':''}`,{kind:'pnf',area:a,pattern:pat});
       if(!A.secondary&&today.indexOf(a)<2){const other=A.patterns.find(x=>x!==pat);const ex2=pick(ctx,a,'S',{pattern:other});if(ex2){const sets=deload?1:p.sets;const sq=[];for(let s=0;s<sets;s++){sq.push({secs:fin,phase:`Static hold${sets>1?` (${s+1}/${sets})`:''}`});if(s<sets-1)sq.push({secs:10,phase:'Ease off',type:'relax'})}
         add('2 · Static: '+A.name,'static',ex2,holdSteps(ex2,sq,{area:a}),`${sets}×${fin}s${ex2.sides?' each side':''}`)}}}

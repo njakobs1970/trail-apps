@@ -47,10 +47,12 @@
 <section id="player" hidden>
  <div class="top"><span id="pStep"></span><span id="pTotal"></span></div>
  <div id="pPhase"></div><h2 id="pName"></h2>
+ <div id="pnfBanner" class="pnfb" role="status" aria-live="assertive" hidden><span id="pnfRep" class="rep"></span><div id="pnfLab" class="lab"></div><div id="pnfHow" class="how"></div></div>
  <div id="pDemo" class="demowrap"></div>
  <div id="pRest" class="restlbl" hidden><b>Rest</b><span id="pRestNext"></span><button type=button id="restQuick" class="link small" hidden></button></div>
  <div class="ringwrap" id="pBarWrap"><svg class="ring" viewBox="0 0 120 120" aria-hidden="true"><circle class="track" cx="60" cy="60" r="54"/><circle id="pBar" class="prog" cx="60" cy="60" r="54" pathLength="100"/></svg><div id="pTime" class="timer">0:00</div></div>
  <div id="rateBox" class="card" hidden><p id="rateQ"></p><div id="rateBtns" class="ratebtns"></div><label class="chk"><input type=checkbox id="pain"> Sharp or joint pain (not just stretch)</label><p id="rateMsg" class="muted"></p></div>
+ <div id="pnfDots" class="pnfdots" aria-hidden="true" hidden></div><p id="pnfNext" class="next pnfnext" hidden></p>
  <p id="pNext" class="muted next"></p>
  <div class="controls"><button id="stopBtn" class="ghost danger">End</button><button id="backBtnP" class="ghost">‹ Back</button><button id="pauseBtn" class="primary">Pause</button><button id="skipBtn" class="ghost">Skip ›</button></div>
  <button type=button id="contBtn" class="primary contbtn" hidden>Continue ›</button><p id="pCue" class="cue"></p><div id="pDesc"></div>
