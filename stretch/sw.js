@@ -1,6 +1,6 @@
-// v25: standing-only routine filter (PNF phase banner unchanged)
+// v24 recovery1: restored v24 app. Cache name is fixed so a v25 install drops stretch25-v25 even if version.js was cached as 25. The button still shows v24.
 importScripts('version.js');
-const C='stretch'+self.VERSION+'-v'+self.VERSION;
+const C='stretch24-recovery1';
 const A=['./','index.html','style.css','app.js','version.js','generator.js','stretches.js','develop.js','evidence.js','library.js','testguide.js','evidence.json','manifest.webmanifest','icon.svg','icon-180.png','icon-192.png','icon-512.png','ten-seconds.mp3'];
 const FRESH=/(\/|index\.html|app\.js|style\.css|version\.js|sw\.js)$/;
 self.addEventListener('install',e=>{e.waitUntil(caches.open(C).then(c=>c.addAll(A.map(u=>new Request(u,{cache:'reload'})))));self.skipWaiting()});
