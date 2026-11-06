@@ -85,11 +85,11 @@ function context(dev,lib,avail,now,seed){
 function roleOf(s){return s.kind==='loaded'?'L':s.kind==='endrange'?'E':'S'}
 function pick(ctx,area,role,{pattern=null,strictNew=true}={}){
   const {lib,dev}=ctx;
-  let c=lib.filter(s=>s.parea===area&&!s.swapOnly&&(role==='L'?s.kind==='loaded':role==='E'?s.kind==='endrange':!s.kind&&(role!=='P'||s.pnf)));
+  let c=lib.filter(s=>s.parea===area&&!s.swapOnly&&(role==='L'?s.kind==='loaded':role==='E'?s.kind==='endrange':!s.kind&&(role!=='P'||s.pnf))&&(!ctx.standingOnly||s.stand));
   if(pattern){const c2=c.filter(s=>s.pattern===pattern);if(c2.length)c=c2}
   const tierOK=c.filter(s=>(s.diff||1)<=pp(dev,s.pattern).tier+1);if(tierOK.length)c=tierOK;
   if(ctx.noCalfEcc&&area==='calves'&&role==='L')return null;
-  let opts=c.map(s=>{const r=ctx.G.resolve(s,lib,ctx.avail);return r&&{s:r===s?s:{...r,swappedFrom:s.name,pattern:s.pattern,parea:s.parea,diff:s.diff,pnf:s.pnf&&r.pnf!==false},base:s}}).filter(Boolean)
+  let opts=c.map(s=>{const r=ctx.G.resolve(s,lib,ctx.avail);if(!r||(ctx.standingOnly&&!r.stand))return null;return {s:r===s?s:{...r,swappedFrom:s.name,pattern:s.pattern,parea:s.parea,diff:s.diff,pnf:s.pnf&&r.pnf!==false},base:s}}).filter(Boolean)
     .filter(o=>!ctx.used.has(o.s.id)&&!ctx.used.has(o.base.id));
   if(!opts.length)return null;
   const ds=o=>Math.min(ctx.last[o.s.id]??99,ctx.last[o.base.id]??99);
@@ -103,7 +103,7 @@ function pick(ctx,area,role,{pattern=null,strictNew=true}={}){
 // key (retest-matched) pattern for an area needs >= retestPatternMinPerWeek days
 function needKey(ctx,a){const A=AREAS[a];if(!A.key)return null;const need=R.retestPatternMinPerWeek||3;
   const have=k=>(ctx.pats[k]?ctx.pats[k].size:0);const low=A.key.filter(k=>have(k)<need).sort((x,y)=>have(x)-have(y));return low[0]||null}
-function secPick(ctx,a){const A=AREAS[a];const L=Object.fromEntries(ctx.lib.map(s=>[s.id,s]));const ids=A.pnf.filter(id=>!ctx.used.has(id));const id=ids[Math.floor(ctx.rand()*ids.length)]||A.pnf[0];ctx.used.add(id);const s=L[id];const r=ctx.G.resolve(s,ctx.lib,ctx.avail)||s;return r!==s?{...r,swappedFrom:s.name}:r}
+function secPick(ctx,a){const A=AREAS[a];const L=Object.fromEntries(ctx.lib.map(s=>[s.id,s]));const ids=A.pnf.filter(id=>L[id]&&!ctx.used.has(id)&&(!ctx.standingOnly||L[id].stand));if(!ids.length&&ctx.standingOnly)return null;const id=ids[Math.floor(ctx.rand()*ids.length)]||A.pnf[0];if(!L[id])return null;ctx.used.add(id);const s=L[id];const r=ctx.G.resolve(s,ctx.lib,ctx.avail)||s;const out=r!==s?{...r,swappedFrom:s.name}:r;if(ctx.standingOnly&&!out.stand)return null;return out}
 function holdSteps(ex,list,extra={}){
   const one=side=>list.map(x=>({type:x.type||'hold',secs:x.secs,ex,side,phase:x.phase,...(x.pnf?{pnf:x.pnf,round:x.round,rounds:x.rounds}:{}),...extra}));
   return ex.sides?[...one('Left'),{type:'switch',secs:SW,next:ex,label:'Switch sides'},...one('Right')]:one(null);
@@ -123,31 +123,36 @@ function build(type,dev,lib,opt={}){
     delete best.over;return best}
   return build1(type,dev,lib,{...opt,now});
 }
-function build1(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0,maxSec=0,group,flavor,afterLong=false,seed=0,seedTry=0,penal=null,longHolds=false}={}){
-  if(type==='develop'&&k==null){let r;for(const kk of [3,2]){r=build1(type,dev,lib,{now,k:kk,avail,rest,maxSec:maxSec||2100,group,afterLong,seed,seedTry,penal,longHolds});if(r.total<=(maxSec||2100))break}return r}
-  if(type==='prerun'&&!drop){let r,dd=0;do{r=build1(type,dev,lib,{now,avail,rest,maxSec,drop:dd||-1});dd++}while(r.total>Math.min(480,maxSec||480)&&PRE_RUN.length-dd>=4);return r}
+function preIds(lib,standingOnly){return standingOnly?PRE_RUN.filter(id=>lib.some(s=>s.id===id&&s.stand)):PRE_RUN}
+function build1(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0,maxSec=0,group,flavor,afterLong=false,seed=0,seedTry=0,penal=null,longHolds=false,standingOnly=false}={}){
+  if(type==='develop'&&k==null){let r;for(const kk of [3,2]){r=build1(type,dev,lib,{now,k:kk,avail,rest,maxSec:maxSec||2100,group,afterLong,seed,seedTry,penal,longHolds,standingOnly});if(r.total<=(maxSec||2100))break}return r}
+  if(type==='prerun'&&!drop){let r,dd=0;const n=preIds(lib,standingOnly).length;do{r=build1(type,dev,lib,{now,avail,rest,maxSec,drop:dd||-1,standingOnly});dd++}while(r.total>Math.min(480,maxSec||480)&&n-dd>=4);return r}
   const G=root.Gen||require('./generator.js');const hasW=!avail||avail.includes('weight');
-  const ctx=context(dev,lib,avail,now,hash(dayKey(now)+'|'+type+'|'+seed+'|'+seedTry));if(penal)ctx.penal=penal;ctx.noCalfEcc=!!afterLong&&R.noHeavyCalfEccAfterLongRun;
+  const ctx=context(dev,lib,avail,now,hash(dayKey(now)+'|'+type+'|'+seed+'|'+seedTry));if(penal)ctx.penal=penal;ctx.noCalfEcc=!!afterLong&&R.noHeavyCalfEccAfterLongRun;ctx.standingOnly=!!standingOnly;
+  const missed=[],staticInstead=[];let breathSkipped=false;
   const L0=Object.fromEntries(lib.map(s=>[s.id,s]));const L=new Proxy(L0,{get:(o,id)=>{const s=o[id];if(!s)return s;const r=G.resolve(s,lib,avail)||s;return r!==s?{...r,swappedFrom:s.name}:r}});
   const blocks=[];const deload=isDeload(dev,now);const cap=longHolds?(R.finalHoldCapOptional||[90])[0]:R.finalHoldCap;
   const add=(name,kind,ex,steps,note,rate)=>blocks.push({name,kind,ex,steps,note,rate});
   const H=s=>Math.max(R.holdMin,Math.round(s));
   let areasToday=[];
   if(type==='prerun'){
-    for(const id of (drop>0?PRE_RUN.slice(0,PRE_RUN.length-drop):PRE_RUN)){const ex=L[id];add('Dynamic warm-up','warmup',ex,holdSteps(ex,[{secs:ex.secs,phase:'Keep moving'}]),`${ex.secs}s${ex.sides?' each side':''} · dynamic`)}
+    const ids=preIds(lib,standingOnly);
+    for(const id of (drop>0?ids.slice(0,Math.max(0,ids.length-drop)):ids)){const ex=L[id];if(!ex)continue;add('Dynamic warm-up','warmup',ex,holdSteps(ex,[{secs:ex.secs,phase:'Keep moving'}]),`${ex.secs}s${ex.sides?' each side':''} · dynamic`)}
   } else if(type==='light'){
     const all=dev.areas.concat(dev.maint);const h=flavor==='postlong'?R.recoveryHold:R.lightHold;
     const slots={};for(const a of all)slots[a]=AREAS[a].secondary||dev.maint.includes(a)?1:(deficit(dev,a,now)>0.5?2:1);
     let tot=Object.values(slots).reduce((x,y)=>x+y,0);const byDef=all.filter(a=>!AREAS[a].secondary).sort((x,y)=>deficit(dev,y,now)-deficit(dev,x,now));
     for(let i=0;tot<6&&i<8;i++){slots[byDef[i%byDef.length]]++;tot++}
-    const picks=[];for(const a of all){for(let i=0;i<slots[a];i++){const ex=AREAS[a].secondary?secPick(ctx,a):pick(ctx,a,'S',{pattern:i===0?needKey(ctx,a):null});if(ex)picks.push({a,ex})}}
+    const picks=[];for(const a of all){let got=false;for(let i=0;i<slots[a];i++){const ex=AREAS[a].secondary?secPick(ctx,a):pick(ctx,a,'S',{pattern:i===0?needKey(ctx,a):null});if(ex){picks.push({a,ex});got=true}}if(!got)missed.push(a)}
     picks.sort((x,y)=>(x.ex.order||4)-(y.ex.order||4));areasToday=all;
     for(const {a,ex} of picks)add(flavor==='postlong'?'Easy flexibility flow':'Light holds','topup',ex,holdSteps(ex,[{secs:H(h*(deload?0.85:1)),phase:'Hold & breathe'}],{area:a}),`${H(h)}s hold${ex.sides?' each side':''}`);
   } else if(type==='topup'){
-    for(const a of dev.areas.concat(dev.maint)){const ex=AREAS[a].secondary?secPick(ctx,a):pick(ctx,a,'P',{pattern:needKey(ctx,a)});if(!ex)continue;const h=deload?40:60;
-      add(AREAS[a].name,'topup',ex,holdSteps(ex,[{secs:h,phase:'Hold & breathe'}],{area:a}),`${h}s hold${ex.sides?' each side':''}`)}
+    for(const a of dev.areas.concat(dev.maint)){let ex=AREAS[a].secondary?secPick(ctx,a):pick(ctx,a,'P',{pattern:needKey(ctx,a)});let sub=false;
+      if(!ex&&standingOnly&&!AREAS[a].secondary){ex=pick(ctx,a,'S',{pattern:needKey(ctx,a)});sub=!!ex;if(sub)staticInstead.push(a)}
+      if(!ex){missed.push(a);continue}const h=deload?40:60;
+      add(AREAS[a].name,'topup',ex,holdSteps(ex,[{secs:h,phase:'Hold & breathe'}],{area:a}),`${h}s hold${ex.sides?' each side':''}${sub?' · no standing PNF for this area':''}`)}
   } else { // develop
-    const ws=[];const warm=WARM_POOL.slice();for(let i=0;i<3&&warm.length;i++)ws.push(warm.splice(Math.floor(ctx.rand()*warm.length),1)[0]);
+    const ws=[];const warm=(standingOnly?WARM_POOL.filter(id=>{const s=L0[id];return s&&s.stand}):WARM_POOL).slice();for(let i=0;i<3&&warm.length;i++)ws.push(warm.splice(Math.floor(ctx.rand()*warm.length),1)[0]);
     for(const id of ws){const ex=L[id];const s=ex.sides?20:30;add('1 · Warm-up','warmup',ex,holdSteps(ex,[{secs:s,phase:'Keep moving'}]),`${s}s${ex.sides?' each side':''} · dynamic`)}
     const g=groups(dev);let today=(group?g[group]:dev.areas.slice(0,2)).slice();
     if(!today.length)today=dev.areas.slice(0,2);
@@ -156,14 +161,17 @@ function build1(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0,maxSec=
     if(behind&&deficit(dev,behind,now)>0.75&&(new Date(now).getDay()+6)%7>=3)today.push(behind);
     today=today.slice(0,k||3);areasToday=today.slice();
     for(const a of today){const A=AREAS[a];const v=vol(dev,a,now);
-      const ex=A.secondary?secPick(ctx,a):pick(ctx,a,'P',{pattern:needKey(ctx,a)});if(!ex)continue;const pat=ex.pattern||a;const p=pp(dev,pat);
+      let ex=A.secondary?secPick(ctx,a):pick(ctx,a,'P',{pattern:needKey(ctx,a)});
+      if(!ex&&standingOnly&&!A.secondary){const sub=pick(ctx,a,'S',{pattern:needKey(ctx,a)});if(sub){staticInstead.push(a);const fin=H(Math.min(pp(dev,sub.pattern||a).final,cap)*(deload?R.deloadFactor:1));
+        add('2 · Static: '+A.name,'static',sub,holdSteps(sub,[{secs:fin,phase:'Hold & breathe'}],{area:a}),`${fin}s hold${sub.sides?' each side':''} · no standing PNF for this area`);continue}}
+      if(!ex){missed.push(a);continue}const pat=ex.pattern||a;const p=pp(dev,pat);
       const rounds=Math.max(1,Math.round(p.rounds*Math.min(v,1.25))),fin=H(Math.min(p.final,cap)*(deload?R.deloadFactor:1));
       const seq=[];for(let r=0;r<rounds;r++)seq.push({secs:R.pnf.contractSec,phase:`Contract ~30% (${r+1}/${rounds})`,type:'contract',pnf:'contract',round:r+1,rounds},{secs:R.pnf.relaxSec,phase:'Relax, breathe out',type:'relax',pnf:'relax',round:r+1,rounds},{secs:R.pnf.sinkSec,phase:`Sink deeper (${r+1}/${rounds})`,pnf:'sink',round:r+1,rounds});
       seq.push({secs:fin,phase:'Final hold',pnf:'final',round:0,rounds});
       add('2 · PNF: '+A.name,'pnf',ex,holdSteps(ex,seq,{area:a}),`PNF ${rounds}×(${R.pnf.contractSec}s contract · ${R.pnf.relaxSec}s relax · ${R.pnf.sinkSec}s deeper) + ${fin}s final${ex.sides?' · each side':''}`,{kind:'pnf',area:a,pattern:pat});
       if(!A.secondary&&today.indexOf(a)<2){const other=A.patterns.find(x=>x!==pat);const ex2=pick(ctx,a,'S',{pattern:other});if(ex2){const sets=deload?1:p.sets;const sq=[];for(let s=0;s<sets;s++){sq.push({secs:fin,phase:`Static hold${sets>1?` (${s+1}/${sets})`:''}`});if(s<sets-1)sq.push({secs:10,phase:'Ease off',type:'relax'})}
         add('2 · Static: '+A.name,'static',ex2,holdSteps(ex2,sq,{area:a}),`${sets}×${fin}s${ex2.sides?' each side':''}`)}}}
-    for(const a of dev.maint.slice(0,1)){const ex=AREAS[a].secondary?secPick(ctx,a):pick(ctx,a,'S');if(ex)add('2 · Maintenance: '+AREAS[a].name,'topup',ex,holdSteps(ex,[{secs:45,phase:'Maintenance hold'}],{area:a}),'45s maintenance hold')}
+    for(const a of dev.maint.slice(0,1)){const ex=AREAS[a].secondary?secPick(ctx,a):pick(ctx,a,'S');if(ex)add('2 · Maintenance: '+AREAS[a].name,'topup',ex,holdSteps(ex,[{secs:45,phase:'Maintenance hold'}],{area:a}),'45s maintenance hold');else missed.push(a)}
     // one loaded end-range block (emphasis 'loaded' areas first), one end-range isometric from a different area
     const ord=today.slice().sort((x,y)=>(dev.emph[y]==='loaded')-(dev.emph[x]==='loaded')||ctx.rand()-0.5);
     let lx=null,la=null;for(const a of ord){lx=AREAS[a].secondary?null:pick(ctx,a,'L');if(lx){la=a;break}}
@@ -173,7 +181,7 @@ function build1(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0,maxSec=
     const eo=today.filter(a=>a!==la).concat(la?[la]:[]);let ee=null,ea=null;for(const a of eo){ee=AREAS[a].secondary?null:pick(ctx,a,'E');if(ee){ea=a;break}}
     if(ee){const id=ee.id;const h=Math.max(R.holdMin,dev.endHold[id]||R.holdMin);const reps=deload?1:2;const seq=[];for(let r=0;r<reps;r++){seq.push({secs:h,phase:`Hold at end range (${r+1}/${reps})`});if(r<reps-1)seq.push({secs:10,phase:'Rest',type:'relax'})}
       add('4 · End-range strength','endrange',ee,holdSteps(ee,seq,{area:ea}),`${reps}×${h}s holds${ee.sides?' each side':''}`,{kind:'endrange',ex:id})}
-    add('5 · Breathing','breath',L.breathing,holdSteps(L.breathing,[{secs:120,phase:'Slow breathing: 4 in, 6 out'}]),'2 min');
+    if(standingOnly)breathSkipped=true;else add('5 · Breathing','breath',L.breathing,holdSteps(L.breathing,[{secs:120,phase:'Slow breathing: 4 in, 6 out'}]),'2 min');
   }
   if(maxSec){const dur=b=>b.steps.reduce((a,s)=>a+s.secs,0)+rest;let tot=()=>blocks.reduce((a,b)=>a+dur(b),0)-rest;
     const order=['topup-maint','static','endrange','loaded','breath-trim','warmup','pnf','topup','breath'];
@@ -188,7 +196,24 @@ function build1(type,dev,lib,{now=Date.now(),k,avail=null,rest=TR,drop=0,maxSec=
   blocks.forEach((b,i)=>{if(i>0)steps.push({type:'transition',secs:rest,next:b.ex,label:'Get ready'});steps.push(...b.steps.map(s=>({...s,block:b.name})));
     if(b.rate)steps.push({type:'rate',secs:0,rate:b.rate,ex:b.ex,block:b.name});
     items.push({...b.ex,baseId:b.ex.id,bw:b.rate&&b.rate.bw,hold:b.steps.find(s=>s.type==='hold').secs,planNote:b.note,block:b.name,kg:b.steps[0].kg,role:b.kind});});
-  return {items,steps,type,focus:type==='prerun'?'trail':null,deload,week:weekIndex(dev,now),areasToday:type==='develop'?blocks.filter(b=>b.kind==='pnf').map(b=>b.rate.area):areasToday,group:group||null,total:steps.reduce((a,x)=>a+x.secs,0)};
+  const covered=new Set(blocks.filter(b=>b.kind!=='warmup'&&b.kind!=='breath').map(b=>(b.rate&&b.rate.area)||((b.steps.find(s=>s.area)||{}).area)).filter(Boolean));
+  const standGaps=standingOnly?[...new Set(missed.concat(staticInstead))].filter(a=>AREAS[a]&&!covered.has(a)):[];
+  let standNote='';
+  if(standingOnly){
+    if(!items.length){standNote='Standing only found no eligible moves for this setup. Sitting, kneeling, lying and floor work were left out, and no new standing versions were added.';
+      if(standGaps.length)standNote+=' Nothing standing is written for '+standGaps.map(a=>AREAS[a].name).join(', ')+'.'}
+    else{
+      const bits=['Standing only is on: every move stays on your feet. A wall or chair is used only where the written instructions already stay standing.'];
+      if(standGaps.length)bits.push('No standing stretch is written for '+standGaps.map(a=>AREAS[a].name).join(', ')+'. Those areas were skipped rather than filled with a floor exercise.');
+      const sub=[...new Set(staticInstead)].filter(a=>covered.has(a));
+      if(sub.length)bits.push('No standing PNF hold is written for '+sub.map(a=>AREAS[a].name).join(', ')+', so a standing static hold is used there. The contract–relax sequence was not copied onto a different exercise.');
+      if(breathSkipped)bits.push('The finish breath is crocodile breathing, lying face down, so it is left out.');
+      const names=[...new Set(items.filter(i=>i.standAssume).map(i=>i.name))];
+      if(names.length)bits.push('Classification notes: '+names.join(', ')+'.');
+      standNote=bits.join(' ');
+    }
+  }
+  return {items,steps,type,focus:type==='prerun'?'trail':null,deload,week:weekIndex(dev,now),areasToday:type==='develop'?blocks.filter(b=>b.kind==='pnf').map(b=>b.rate.area):areasToday,group:group||null,total:steps.reduce((a,x)=>a+x.secs,0),standingOnly:!!standingOnly,standNote,standGaps};
 }
 // Record what was done (feeds the no-repeat and variety rules). Keeps ~60 sessions.
 function record(dev,routine,now=Date.now()){
