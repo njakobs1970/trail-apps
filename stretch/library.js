@@ -39,115 +39,12 @@ const T={
 '90-90':['hip-rot',2,1],'9090-lift':['hip-rot',2,0],'hip-cars':['hip-rot',1,0],'happy-baby':['hip-rot',1,0],
 'frog':['adductor',2,0],'butterfly':['adductor',1,1],'reclined-butterfly':['adductor',1,0],'straddle-reach':['adductor',2,1],'side-lunge':['adductor',1,0],'cossack':['adductor',2,0],'copenhagen':['adductor',2,0],'side-adduct':['adductor',1,0],'adductor-rock':['adductor',1,0]};
 const PAT_AREA={'calf-straight':'calves','calf-bent':'calves','ham-hinge':'hamstrings','ham-supine':'hamstrings',hipflex:'hipflex',quad:'hipflex','hip-er':'hips','hip-rot':'hips',adductor:'hips'};
-// Standing eligibility, reviewed from each move's setup, steps and cue (not from the name).
-// 1 = the written instructions stay on the feet. A wall, rail or chair is allowed only as support.
-// 0 = the written instructions sit, kneel, lie or use the floor. No standing variation was invented.
-// The string is a classification note. Empty means the position is unambiguous. Notes are shown in the app.
-const OR='Setup offers standing and another position. Standing only uses the written standing option.';
-const SITINTO='“Sit into” means shifting the hips over a bent leg. Both feet stay planted; you do not sit down.';
-const STAND={
-'adductor-rock':[1,SITINTO],
-'standing-ham':[1,''],
-'wide-fold':[1,'Standing forward hinge. The hands may reach the floor; both feet stay planted.'],
-'quad-stand':[1,''],
-'calf-wall':[1,''],
-'soleus':[1,''],
-'step-calf':[1,''],
-'it-cross':[1,''],
-'side-bend':[1,''],
-'cross-arm':[1,OR],
-'triceps':[1,OR],
-'doorway':[1,''],
-'neck-side':[1,'Setup says sit or stand. Standing only uses standing. The “sit tall” cue is the other written option and is not used.'],
-'deep-squat':[1,'Hips drop between the heels with the heels down. You stay on your feet, not sitting, kneeling or lying.'],
-'wrist-flex':[1,OR],
-'wrist-ext':[1,OR],
-'leg-swing':[1,''],
-'leg-swing-side':[1,''],
-'ankle-circles':[1,''],
-'walking-lunge':[1,'The back knee moves toward the floor, then you step through. The instructions do not rest the knee down.'],
-'knee-wall':[1,'Setup allows a kneel or a standing split stance. Standing only uses the written split stance.'],
-'cossack':[1,SITINTO],
-'deficit-calf':[1,''],
-'jefferson':[1,'Standing roll-down on a box or step. The feet stay under you.'],
-'sl-rdl':[1,''],
-'tib-raise':[1,''],
-'toe-mob':[1,'Setup says sit on a chair or stand barefoot. Standing only uses the written standing option.'],
-'soleus-iso':[1,''],
-'floor-calf-ecc':[1,''],
-'pike-lower':[1,'Standing roll-down. The hands may hang toward the floor; you do not sit or lie down.'],
-'wall-chest':[1,''],
-'band-ankle':[1,'Setup allows a half-kneel or a standing split stance. Standing only uses the written standing split stance.'],
-'calf-ecc-bent':[1,''],
-'heel-chair-ham':[1,'One heel rests on a chair. The other foot stays on the floor and the body stays standing.'],
-'standing-hf':[1,''],
-'split-squat-ecc':[1,'The back knee pauses near the floor without being set down. It stays a standing split squat.'],
-'side-lunge':[1,SITINTO],
-'hip-cars':[1,''],
-'kneel-hip-flexor':[0,'Setup starts kneeling on one knee.'],
-'couch':[0,'Setup starts kneeling, with the shin up a wall or sofa.'],
-'pigeon':[0,'Starts on hands and knees and folds on the mat.'],
-'figure4':[0,'Setup is lying on your back.'],
-'90-90':[0,'Setup is sitting on the floor.'],
-'frog':[0,'Starts on hands and knees.'],
-'butterfly':[0,'Setup is sitting on the floor.'],
-'lizard':[0,'The back knee is lowered to the floor.'],
-'supine-ham':[0,'Setup is lying on your back.'],
-'seated-fold':[0,'Setup is sitting on the floor.'],
-'side-quad':[0,'Setup is lying on your side.'],
-'downdog':[0,'Hands and feet are on the floor in an inverted V. That is floor work.'],
-'toe-sit':[0,'Setup starts kneeling, then sitting back on the heels.'],
-'shin':[0,'Setup starts kneeling.'],
-'childs':[0,'Setup starts kneeling.'],
-'cat-cow':[0,'Setup is hands and knees.'],
-'supine-twist':[0,'Setup is lying on your back.'],
-'thread-needle':[0,'Setup is hands and knees. “Standing hand” means the supporting hand, not a standing position.'],
-'cobra':[0,'Setup is lying face down.'],
-'knees-chest':[0,'Setup is lying on your back.'],
-'puppy':[0,'Setup is hands and knees.'],
-'worlds-greatest':[0,'Setup is a lunge with the back knee low or resting on the floor.'],
-'happy-baby':[0,'Setup is lying on your back.'],
-'ankle-circle':[0,'Setup is half-kneeling.'],
-'legs-wall':[0,'Setup swings the legs up a wall and lies back.'],
-'reclined-butterfly':[0,'Setup is lying on your back.'],
-'side-child':[0,'Starts in child\'s pose, which is kneeling.'],
-'banana':[0,'Setup is lying on your back.'],
-'levator':[0,'Setup is sitting on a chair or the floor. No standing option is written.'],
-'open-book':[0,'Setup is lying on your side.'],
-'alsr-hold':[0,'Setup is lying on your back.'],
-'kneel-lift':[0,'Setup is a deep half-kneeling stretch.'],
-'9090-lift':[0,'Setup is sitting in 90/90.'],
-'tspine-lift':[0,'Setup is hands and knees.'],
-'breathing':[0,'Setup is lying face down.'],
-'thigh-ham':[0,'Setup is lying on your back.'],
-'kneel-soleus':[0,'Setup starts kneeling on one knee.'],
-'kot-weighted':[0,'Setup is half-kneeling.'],
-'half-split':[0,'Setup starts kneeling.'],
-'half-split-bw':[0,'Setup starts kneeling.'],
-'nordic-assist':[0,'Setup starts kneeling.'],
-'pike-lift':[0,'Setup is sitting with the legs straight.'],
-'rfe-hip-flexor':[0,'The back knee is down and the back foot is on a chair.'],
-'thomas-stretch':[0,'Setup rolls back on a bed and lets one leg hang.'],
-'reverse-nordic':[0,'Setup starts kneeling.'],
-'straddle-reach':[0,'Setup is sitting with the legs wide.'],
-'bench-pigeon':[0,'The front shin rests across a bench in pigeon. A straight back leg does not make this standing.'],
-'weighted-pigeon':[0,'Setup is pigeon on the floor.'],
-'copenhagen':[0,'Setup is lying on your side.'],
-'side-adduct':[0,'Setup is lying on your side.']
-};
-function applyStand(lib){
-  for(const s of lib){const t=STAND[s.id];
-    if(!t){s.stand=false;s.standUnreviewed=true;s.standAssume='Unreviewed instructions; excluded from standing only.';continue}
-    s.stand=!!t[0];s.standAssume=t[1]||'';s.standUnreviewed=false}
-  return lib;
-}
 function install(lib){
   const by=Object.fromEntries(lib.map(s=>[s.id,s]));
   for(const n of NEW){if(by[n.id])continue;const b=by[n.poseFrom];const s={...n,pose:b?b.pose:[],demoNote:b?'Demo shows the closest base position ('+b.name+').':''};lib.push(s);by[s.id]=s}
   for(const s of lib){const t=T[s.id];if(t){s.pattern=t[0];s.diff=t[1];s.pnf=!!t[2];s.parea=PAT_AREA[t[0]]}}
-  applyStand(lib);
   return lib;
 }
-const api={NEW,TAGS:T,PAT_AREA,STAND,applyStand,install};
+const api={NEW,TAGS:T,PAT_AREA,install};
 if(typeof module!=='undefined')module.exports=api;else{root.LIB2=api;if(root.STRETCHES)install(root.STRETCHES)}
 })(this);
