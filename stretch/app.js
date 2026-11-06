@@ -68,12 +68,12 @@ function esc(t){return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function fullDesc(s){
   return `<div class="desc"><p><b>Setup:</b> ${esc(s.setup)}</p><ol>${s.steps.map(x=>`<li>${esc(x)}</li>`).join('')}</ol>
 <p><b>Feel it:</b> ${esc(s.feel)}</p><p><b>Avoid:</b> ${esc(s.mistakes)}</p>
-${s.demoNote?`<p class="muted">${esc(s.demoNote)}</p>`:''}<p><b>Easier:</b> ${esc(s.easier)}<br><b>Harder:</b> ${esc(s.harder)}</p>${s.perSide?`<p class="side">↔ <b>Per side:</b> ${esc(s.perSide)}</p>`:''}</div>`;
+${s.demoNote?`<p class="muted">${esc(s.demoNote)}</p>`:''}${settings.standingOnly&&s.standAssume?`<p class="muted"><b>Standing classification:</b> ${esc(s.standAssume)}</p>`:''}<p><b>Easier:</b> ${esc(s.easier)}<br><b>Harder:</b> ${esc(s.harder)}</p>${s.perSide?`<p class="side">↔ <b>Per side:</b> ${esc(s.perSide)}</p>`:''}</div>`;
 }
 // ---------- Plan ----------
-function newRoutine(){const t=settings.type;
-  if(['plan','develop','light','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES,{avail:Gen.availOf(settings),rest:settings.rest||30,maxSec:settings.cap?settings.cap*60:0,seed:regen,longHolds:!!settings.longHolds,plan:{today:settings.today,lastLong:settings.lastLong,maintenance:!!settings.maintenance}});
-  else routine=Gen.generate(STRETCHES,{targetSec:(settings.cap||(t==='relax'?15:settings.minutes))*60,focus:t==='relax'?'sleep':settings.focus,avail:Gen.availOf(settings),rest:settings.rest||30});
+function newRoutine(){const t=settings.type;const standingOnly=Gen.standingOn(settings);
+  if(['plan','develop','light','topup','prerun'].includes(t))routine=Dev.build(t,dev,STRETCHES,{avail:Gen.availOf(settings),rest:settings.rest||30,maxSec:settings.cap?settings.cap*60:0,seed:regen,longHolds:!!settings.longHolds,standingOnly,plan:{today:settings.today,lastLong:settings.lastLong,maintenance:!!settings.maintenance}});
+  else routine=Gen.generate(STRETCHES,{targetSec:(settings.cap||(t==='relax'?15:settings.minutes))*60,focus:t==='relax'?'sleep':settings.focus,avail:Gen.availOf(settings),rest:settings.rest||30,standingOnly});
   routine.type=routine.type||t;routine.label=(routine.plan?routine.plan.label:TYPES[t])+(t==='random'?' · '+Gen.FOCUSES[routine.focus]:t==='relax'?' · sleep & relaxation':'');renderPlan()}
 function renderEquip(){
   const need=new Set();routine.items.forEach(i=>Gen.equipFor(i,i.bw?0:i.kg).forEach(e=>need.add(e)));
@@ -107,7 +107,7 @@ function restLabel(){return settings.restMode==='tap'?'Tap to continue':'Timed '
 function renderHero(){const d=new Date();$('#heroDay').textContent=d.toLocaleDateString(undefined,{weekday:'long'})+' · '+TODAY[settings.today][0];
   $('#heroTitle').textContent=routine.label;
   $('#heroMeta').textContent=fmt(settings.restMode==='tap'?activeSec(routine.steps):Gen.totalSec(routine.steps))+(settings.restMode==='tap'?' + rests':'')+' · '+routine.items.length+' moves';
-  const ar=(routine.areasToday||[]).filter(a=>Dev.AREAS[a]);$('#heroChips').innerHTML=(ar.length?ar.map(a=>Dev.AREAS[a].name.replace(/\s*\(.*\)/,'')):[routine.focus&&Gen.FOCUSES[routine.focus]||'']).filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('');
+  const ar=(routine.areasToday||[]).filter(a=>Dev.AREAS[a]);const chips=(settings.standingOnly?['Standing only']:[]).concat(ar.length?ar.map(a=>Dev.AREAS[a].name.replace(/\s*\(.*\)/,'')):[routine.focus&&Gen.FOCUSES[routine.focus]||'']);$('#heroChips').innerHTML=chips.filter(Boolean).map(x=>`<span>${esc(x)}</span>`).join('');
   $('#heroGuide').textContent=TODAY[settings.today][2];
   $('#optRows').innerHTML=[['today','Today',TODAY[settings.today][0]],['type','Session',TYPES[settings.type]],['length','Length',capLabel()],['rest','Rest',restLabel()]].map(([k,l,v])=>`<li><button type=button data-p="${k}"><span>${l}</span><span class=val>${esc(v)}</span></button></li>`).join('')}
 let pk=null;
@@ -129,10 +129,17 @@ function renderPlan(){
   $('#planCount').textContent=routine.items.length;
   $('#planFocus').textContent=routine.label;renderDev();renderEquip();renderHero();
   document.querySelectorAll('#focusChips button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.f===settings.focus));
+  const standNote=$('#standNote'),standSw=$('#standSw');
+  if(standSw)standSw.checked=!!settings.standingOnly;
+  if(standNote){standNote.hidden=!routine.standNote;standNote.textContent=routine.standNote||'';}
+  $('#startBtn').disabled=!routine.items.length;
+  $('#startBtn').textContent=routine.items.length?'Start session':'Nothing to start';
+  if(!routine.items.length){$('#planList').innerHTML=`<li class="empty">${esc(routine.standNote||'Nothing in this routine.')}</li>`;return}
   let lastB='';$('#planList').innerHTML=routine.items.map((s,i)=>`${s.block&&s.block!==lastB?`<li class="blk">${esc(lastB=s.block)}</li>`:''}<li><details><summary><span class=ic>${s.icon}</span><div><b>${i+1}. ${esc(s.name)}</b><small>${s.planNote?esc(s.planNote):`${s.sides?'L + R · ':''}${s.hold}s${s.sides?' each':''} · ${s.area.join(', ')}`}</small><span class="sum">${esc(s.cue)}</span></div></summary>${demoSVG(s,'demo small')}${fullDesc(s)}</details></li>`).join('');
 }
 // ---------- Player ----------
 function start(){
+  if(!routine||!routine.steps.length)return;
   unlockAudio();beep(660,0.05); // unlock audio inside the user gesture
   lockScreen();
   run={i:0,stepEnd:0,paused:false,remainingAtPause:0,startedAt:Date.now()};
@@ -262,6 +269,7 @@ function bindSettings(){
   $('#areaPick').onchange=e=>{const a=e.target.dataset.a;if(!a)return;let ar=dev.areas.filter(x=>x!==a);if(e.target.checked)ar.push(a);
     if(ar.length<3||ar.length>4){e.target.checked=!e.target.checked;$('#areaMsg').textContent='Pick 3–4 priority areas.';return}$('#areaMsg').textContent='';dev.areas=ar;dev.maint=dev.maint.filter(x=>x!==a);dev.rotate=0;saveDev();newRoutine()};
   document.querySelectorAll('.noEquip').forEach(c=>c.onchange=()=>{settings.noEquip=c.checked;save();newRoutine()});
+  $('#standSw').onchange=e=>{settings.standingOnly=!!e.target.checked;LS.set('settings',settings);newRoutine()};
   $('#ownList').onchange=e=>{const k=e.target.dataset.own;if(!k)return;const o=new Set(settings.owned||Gen.OWNABLE);e.target.checked?o.add(k):o.delete(k);settings.owned=[...o];save();newRoutine()};
   $('#loads').onchange=e=>{const id=e.target.dataset.load;if(!id)return;dev.loads[id]=Math.max(0,Number(e.target.value)||0);saveDev();newRoutine()};
   ['#scName','#autoLog'].forEach(s=>$(s).addEventListener('change',save));
